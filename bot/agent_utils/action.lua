@@ -2,6 +2,7 @@ Action = {}
 
 local bot = GetBot()
 
+local NEARBY_RADIUS = 1500
 local ACTION_MOVE = 0
 local ACTION_ATTACK_HERO = 1
 local ACTION_ATTACK_CREEP = 2
@@ -9,8 +10,8 @@ local ACTION_USE_ABILITY = 3
 local ACTION_ATTACK_TOWER = 4
 local ACTION_MOVE_DISCRETE = 5
 local ACTION_DO_NOTHING = 6
-local last_time_move = GameTime()
 
+local last_time_move = GameTime()
 local wrong_action = 0
 
 local ABILITY = {
@@ -21,56 +22,37 @@ local ABILITY = {
 }
 
 function Action.last_time_moved()
-    if last_time_move == nil then
-        last_time_move = GameTime()
-    end
     return last_time_move
 end
 
---- Move by delta vector.
+--- Move by the delta vector.
 -- @param delta_vector
 --
 function move_delta(delta_vector)
-    local position = bot:GetLocation()
+    print('MOVE DELTA', delta_vector[1], delta_vector[2])
 
     last_time_move = GameTime()
 
-    print('MOVE', delta_vector[1], delta_vector[2])
+    local position = bot:GetLocation()
     position[1] = position[1] + delta_vector[1]
     position[2] = position[2] + delta_vector[2]
-
     bot:Action_MoveToLocation(position)
 end
 
--- 16 possible directions: 0-15
+--- Move towards the specified angle.
+-- @param direction value from 0-15 that maps to direction/8*pi
+--
 function move_discrete(direction)
     print('MOVE DISCRETE', direction)
-    local position = bot:GetLocation()
-    local x = 150
-    local y = 0
-    local theta = 0 + direction * (math.pi / 8)
-    local sin_theta = math.sin(theta)
-    local cos_theta = math.cos(theta)
 
-    position[1] = position[1] + x * cos_theta - y * sin_theta
-    position[2] = position[2] + x * sin_theta + y * cos_theta
-    bot:Action_MoveToLocation(position)
-end
-
---- Attack enemy hero.
---
-function attack_hero()
-    print('ATTACK HERO')
-    local enemy_table = GetUnitList(UNIT_LIST_ENEMY_HEROES)
-    local enemy
-    wrong_action = 1
-    if #enemy_table > 0 then
-        enemy = enemy_table[1]
-        if GetUnitToUnitDistance(bot, enemy) < 1500 then
-            wrong_action = 0
-            bot:Action_AttackUnit(enemy, false)
-        end
-    end
+    local radius = 150
+    local angle = direction * (math.pi / 8)
+    local sin_theta = math.sin(angle)
+    local cos_theta = math.cos(angle)
+    local delta_vector = {}
+    delta_vector[1] = radius * cos_theta
+    delta_vector[2] = radius * sin_theta
+    move_delta(delta_vector)
 end
 
 --- Use ability.
@@ -86,12 +68,23 @@ function use_ability(ability_idx)
     end
 end
 
+--- Attack the closest enemy hero nearby.
+function attack_hero()
+    print('ATTACK HERO')
+    local enemy_heroes_list = bot:GetNearbyHeroes(NEARBY_RADIUS, true, BOT_MODE_NONE)
+    if #enemy_heroes_list > 0 then
+        bot:Action_AttackUnit(enemy_heroes_list[1], false)
+    else
+        wrong_action = 1
+    end
+end
+
 --- Attack enemy creep.
 -- @param creep_idx index of creep in nearby creeps table.
 --
 function attack_creep(creep_idx)
     print('ATTACK CREEP', creep_idx)
-    local enemy_creeps = bot:GetNearbyCreeps(1500, true)
+    local enemy_creeps = bot:GetNearbyCreeps(NEARBY_RADIUS, true)
     if #enemy_creeps >= creep_idx then
         bot:Action_AttackUnit(enemy_creeps[creep_idx], false)
     else
@@ -99,9 +92,10 @@ function attack_creep(creep_idx)
     end
 end
 
+-- Attack nearby enemy tower.
 function attack_tower()
     print('ATTACK TOWER')
-    local towers = bot:GetNearbyTowers(1500, true)
+    local towers = bot:GetNearbyTowers(NEARBY_RADIUS, true)
     if #towers > 0 then
         bot:Action_AttackUnit(towers[1], false)
     else
@@ -109,6 +103,7 @@ function attack_tower()
     end
 end
 
+-- Take all available abilities' upgrades.
 function upgrade_abilities()
     bot:ActionImmediate_LevelAbility('nevermore_shadowraze1')
     bot:ActionImmediate_LevelAbility('nevermore_requiem')
@@ -125,20 +120,23 @@ function Action.execute_action(action_info)
     upgrade_abilities()
 
     if action == ACTION_MOVE then
-        -- Consider params[1], params[2] as x, y of delta vector
+        -- Consider params[1], params[2] as x, y of a delta vector
         move_delta(action_params)
-    elseif action == ACTION_ATTACK_HERO then
-        attack_hero()
+    elseif action == ACTION_MOVE_DISCRETE then
+        -- Move towards the angle computed as (params[1] / 8 * pi)
+        move_discrete(action_params[1])
     elseif action == ACTION_USE_ABILITY then
-        -- Consider params[1] as ability index
+        -- Consider params[1] as an ability index
         use_ability(action_params[1])
+    elseif action == ACTION_ATTACK_HERO then
+        -- Attacks the closest enemy hero.
+        attack_hero()
     elseif action == ACTION_ATTACK_CREEP then
-        -- Consider params[1] as index in nearby creeps table
+        -- Consider params[1] as an index in the nearby creeps table
         attack_creep(action_params[1])
     elseif action == ACTION_ATTACK_TOWER then
+        -- Attacks the closes enemy tower.
         attack_tower()
-    elseif action == ACTION_MOVE_DISCRETE then
-        move_discrete(action_params[1])
     elseif action == ACTION_DO_NOTHING then
         -- do nothing
     end
