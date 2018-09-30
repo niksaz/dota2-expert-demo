@@ -1,9 +1,9 @@
-from policy_gradient.agent import PGAgent
+import unittest
 
 import numpy as np
-from numpy.testing import *
-import unittest
 from matplotlib import pyplot as plt
+
+from policy_gradient.agent import PGAgent
 
 
 class TestPGAgent(unittest.TestCase):
