@@ -16,8 +16,6 @@ def create_dota_agent():
     return PGAgent(environment=DotaEnvironment,
                    episodes=3000,
                    batch_size=200,
-                   eps=0.99,
-                   discount=0.3,
                    eps_update=0.999)
 
 

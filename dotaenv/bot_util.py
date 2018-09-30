@@ -3,46 +3,6 @@
 import numpy as np
 
 
-class ActionClass:
-    ACTION_MOVE = 0
-    ACTION_ATTACK_HERO = 1
-    ACTION_ATTACK_CREEP = 2
-    ACTION_USE_ABILITY = 3
-
-
-# TODO
-# def action_to_json(action_vector):
-#     """
-#     Transform vectorized action to bot-compatible JSON message
-#
-#     Action space:
-#             [0:5] - one-hot action class
-#             [5:15] - one-hot creep to attack
-#             [15:19] - one-hot ability index
-#             [19:21] - move coordinates
-#
-#     :param action_vector: vectorized action
-#     :return: bot-compatible JSON action message
-#     """
-#     action = int(np.argmax(action_vector[0:4]))
-#     params = []
-#     if action is 0:
-#         params.append(float(action_vector[19]))
-#         params.append(float(action_vector[20]))
-#     elif action is 1:
-#         pass
-#     elif action is 2:
-#         params.append(int(np.argmax(action_vector[5:15])) + 1)
-#     elif action is 3:
-#         params.append(int(np.argmax(action_vector[15:19])) + 1)
-#
-#     action_response = {
-#         'action': action,
-#         'params': params
-#     }
-#     return action_response
-
-
 def action_to_json(action):
     """
     Lua indexes starts from 1!
@@ -55,7 +15,7 @@ def action_to_json(action):
     local ACTION_MOVE_DISCRETE = 5
     local ACTION_DO_NOTHING = 6
 
-    :param action_vector: vectorized action
+    :param action: action numeric code
     :return: bot-compatible JSON action message
     """
 

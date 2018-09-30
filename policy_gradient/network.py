@@ -37,7 +37,8 @@ class Network:
         if restore:
             self.saver.restore(self.session, 'saved_model/model.ckpt')
 
-    def build(self, input_shape=172, output_shape=25, learning_rate=0.01, layer_shape=80):
+    def build(self, input_shape=172, output_shape=25, learning_rate=0.01,
+              layer_shape=8):
         """
         Build action classifier network for policy gradient algorithm.
 
@@ -84,12 +85,16 @@ class Network:
         :param actions:  np array of shape (batch_size, output_shape)
         :param rewards: normalized discounted rewards np.array of shape (batch_size, )
         """
-        # TODO TEMP SLICE
-        self.session.run(self.train_op, feed_dict={self.states: states[:, :2], self.actions: actions,
-                                                   self.rewards: rewards})
-        loss = self.session.run(self.loss, feed_dict={self.states: states[:, :2], self.actions: actions,
-                                               self.rewards: rewards})
-        #logger.debug(loss)
+
+        feed_dict = {
+            self.states: states[:, :2],  # TODO TEMP SLICE
+            self.actions: actions,
+            self.rewards: rewards
+        }
+        self.session.run(self.train_op, feed_dict=feed_dict)
+        loss = self.session.run(self.loss, feed_dict=feed_dict)
+        logger.debug('Loss:')
+        logger.debug(loss)
         self.saver.save(self.session, 'saved_model/model.ckpt')
 
     def predict(self, state):
