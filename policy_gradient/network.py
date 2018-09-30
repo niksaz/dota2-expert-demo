@@ -21,7 +21,7 @@ class Network:
                  'saver')
 
     def __init__(self, input_shape=172, output_shape=25, learning_rate=0.01,
-                 restore=True):
+                 restore=False):
         self.predict_op = None
         self.train_op = None
         self.states = None

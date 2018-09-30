@@ -13,6 +13,11 @@ def launch_dota():
     gui.press('enter')
     time.sleep(1)
 
+    # search for Dota 2 in the library
+    gui.click(x=50, y=110)
+    gui.typewrite('dota', interval=0.1)
+
+    # press play
     gui.click(x=335, y=225, pause=20)
 
 
@@ -38,7 +43,7 @@ def set_timescale():
     gui.press('\\', pause=0.1)
     gui.typewrite('sv_cheats 1', interval=0.05, pause=0.3)
     gui.press('enter', pause=0.1)
-    gui.typewrite('host_timescale 4', interval=0.05, pause=0.3)
+    gui.typewrite('host_timescale 5', interval=0.05, pause=0.3)
     gui.press('enter', pause=0.1)
     gui.press('\\', pause=0.5)
 

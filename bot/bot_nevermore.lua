@@ -77,8 +77,7 @@ end
 --- MODIFY THIS to modify reward
 --
 function get_reward()
-    -- Reward.get_reward(wrong_action)
-    return Reward.tower_distance_reward()
+     return Reward.get_reward(wrong_action)
 end
 
 --- Send JSON with current state info.
@@ -91,8 +90,7 @@ function send_observation_message()
     if GetGameState() == GAME_STATE_POST_GAME or
             GetHeroKills(this_player_id) > 0 or
             GetHeroDeaths(this_player_id) > 0 or
-            DotaTime() > 350 or
-            Reward.get_distance_to_tower() < 500 then
+            DotaTime() > 350 then
         _end = true
         print('Bot: the game has ended.')
     end

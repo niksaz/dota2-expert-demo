@@ -47,12 +47,9 @@ function move_discrete(direction)
 
     local radius = 150
     local angle = direction * (math.pi / 8)
-    local sin_theta = math.sin(angle)
     local cos_theta = math.cos(angle)
-    local delta_vector = {}
-    delta_vector[1] = radius * cos_theta
-    delta_vector[2] = radius * sin_theta
-    move_delta(delta_vector)
+    local sin_theta = math.sin(angle)
+    move_delta({ radius * cos_theta, radius * sin_theta })
 end
 
 --- Use ability.
@@ -105,8 +102,11 @@ end
 
 -- Take all available abilities' upgrades.
 function upgrade_abilities()
-    bot:ActionImmediate_LevelAbility('nevermore_shadowraze1')
-    bot:ActionImmediate_LevelAbility('nevermore_requiem')
+    for _, ability in ipairs(ABILITY) do
+        if ability:CanAbilityBeUpgraded() then
+            bot:ActionImmediate_LevelAbility(ability:GetName())
+        end
+    end
 end
 
 --- Execute given action.

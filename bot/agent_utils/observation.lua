@@ -3,21 +3,11 @@ local Observation = {}
 
 local bot = GetBot()
 
+local NEARBY_RADIUS = 1500
 local ability1 = bot:GetAbilityByName('nevermore_shadowraze1')
 local ability2 = bot:GetAbilityByName('nevermore_shadowraze2')
 local ability3 = bot:GetAbilityByName('nevermore_shadowraze3')
 local ability4 = bot:GetAbilityByName('nevermore_requiem')
-
-local creep_zero_padding = { 0, 0, 0 }
-
--- Obtain team info.
-local function get_team()
-    if (GetTeam() == TEAM_RADIANT) then
-        return 1
-    else
-        return -1
-    end
-end
 
 -- Obtain damage info.
 function get_damage_info()
@@ -29,14 +19,15 @@ function get_damage_info()
     return damage_info
 end
 
--- Obtain towers info.
+-- Obtain towers' info.
 function get_towers_info()
-    local enemy_tower = GetTower(TEAM_DIRE, TOWER_MID_1);
-    local ally_tower = GetTower(TEAM_RADIANT, TOWER_MID_1);
-    if get_team() == -1 then
-        local temp = ally_tower
-        ally_tower = enemy_tower
-        enemy_tower = temp
+    local ally_tower, enemy_tower
+    if GetTeam() == TEAM_RADIANT then
+        ally_tower = GetTower(TEAM_RADIANT, TOWER_MID_1)
+        enemy_tower = GetTower(TEAM_DIRE, TOWER_MID_1)
+    else
+        ally_tower = GetTower(TEAM_DIRE, TOWER_MID_1)
+        enemy_tower = GetTower(TEAM_RADIANT, TOWER_MID_1)
     end
 
     return {
@@ -45,8 +36,7 @@ function get_towers_info()
     }
 end
 
---- Obtain bot's info (specified for Nevermore).
---
+-- Obtain bot's info (specified for Nevermore).
 function get_self_info()
     local ability1_dmg = 0
     if ability1:IsFullyCastable() then
@@ -88,17 +78,14 @@ function get_self_info()
 end
 
 -- Obtain enemy hero info.
-function get_enemy_info()
-    local enemy_table = GetUnitList(UNIT_LIST_ENEMY_HEROES)
-    local enemy
-    if enemy_table ~= nil then
-        enemy = enemy_table[1]
-    end
+function get_enemy_hero_info()
+    local enemy_hero_info = { 0, 0, 0, 0, 0, 0, 0 }
 
-    local enemy_hero_input = { 0, 0, 0, 0, 0, 0, 0 }
-    if (enemy ~= nil) then
+    local enemy_heroes_list = bot:GetNearbyHeroes(NEARBY_RADIUS, true, BOT_MODE_NONE)
+    if #enemy_heroes_list > 0 then
+        local enemy = enemy_heroes_list[1]
         local enemy_position = enemy:GetLocation()
-        enemy_hero_input = {
+        enemy_hero_info = {
             enemy_position[1],
             enemy_position[2],
             enemy:GetAttackDamage(),
@@ -109,20 +96,17 @@ function get_enemy_info()
         }
     end
 
-    return enemy_hero_input
+    return enemy_hero_info
 end
 
--- Obtain creeps info.
+--- Retrieve info from the given creeps.
+-- @param creeps to retrieve info from
+--
 function get_creeps_info(creeps)
+    print('get_creeps_info', creeps)
+
     local creeps_info = {}
-
-    if (creeps == nil) then
-        table.insert(creeps_info, creep_zero_padding)
-        return creeps_info
-    end
-
-    for creep_key, creep in pairs(creeps)
-    do
+    for _, creep in pairs(creeps) do
         local position = creep:GetLocation()
         table.insert(creeps_info, {
             creep:GetHealth(),
@@ -132,6 +116,7 @@ function get_creeps_info(creeps)
     end
 
     -- if creeps_info is empty:
+    local creep_zero_padding = { 0, 0, 0 }
     if #creeps_info == 0 then
         table.insert(creeps_info, creep_zero_padding)
     end
@@ -139,14 +124,14 @@ function get_creeps_info(creeps)
     return creeps_info
 end
 
--- Get whole observation.
+-- Get all observations.
 function Observation.get_observation()
     local enemy_creeps = get_creeps_info(bot:GetNearbyCreeps(1500, true))
     local ally_creeps = get_creeps_info(bot:GetNearbyCreeps(1500, false))
 
     local observation = {
         ['self_info'] = get_self_info(),
-        ['enemy_info'] = get_enemy_info(),
+        ['enemy_info'] = get_enemy_hero_info(),
         ['enemy_creeps_info'] = enemy_creeps,
         ['ally_creeps_info'] = ally_creeps,
         ['tower_info'] = get_towers_info(),

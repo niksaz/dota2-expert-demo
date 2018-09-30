@@ -13,7 +13,7 @@ import matplotlib.pyplot as plt
 
 logger = logging.getLogger('DotaRL')
 logger.setLevel(logging.DEBUG)
-fh = logging.FileHandler('log/policy_gradient{time}.log'.format(time=time.strftime("%Y%m%d-%H%M%S")))
+fh = logging.FileHandler('logs/policy_gradient{time}.log'.format(time=time.strftime("%Y%m%d-%H%M%S")))
 fh.setLevel(logging.DEBUG)
 logger.addHandler(fh)
 logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')

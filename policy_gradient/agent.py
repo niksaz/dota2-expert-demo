@@ -33,7 +33,9 @@ class PGAgent:
 
     def __init__(self, environment, episodes=100, batch_size=100, eps=0.7, discount=0.99, eps_update=0.99):
         self.replay_buffer = ReplayBuffer()
-        self.network = Network(input_shape=input_shape, output_shape=output_shape)
+        self.network = Network(input_shape=input_shape,
+                               output_shape=output_shape,
+                               restore=False)
         self.env = environment()
         self.episodes = episodes
         self.batch_size = batch_size
@@ -48,9 +50,9 @@ class PGAgent:
             states, actions, rewards = self.sample_data(steps=self.batch_size)
             rewards = np.array(rewards, dtype='float32')
 
-            logger.debug('Finished episode {ep} with total reward {rew}. eps={eps}'.format(ep=episode,
-                                                                                           rew=np.sum(rewards),
-                                                                                                       eps=self.eps))
+            temp = 'Finished episode {ep} with total reward {rew}. eps={eps}'
+            logger.debug(temp.format(ep=episode, rew=np.sum(rewards),
+                                     eps=self.eps))
 
             self.rewards.extend(rewards)
 
