@@ -15,8 +15,6 @@ local DO_NOTHING = 3
 local fsm_state = SEND_OBSERVATION
 
 local wrong_action = 0
-local this_bot = GetBot()
-local this_player_id = this_bot:GetPlayerID()
 
 --- Executes received action.
 -- @param action_info bot action

@@ -2,6 +2,7 @@
 local Observation = {}
 
 local bot = GetBot()
+local bot_player_id = bot:GetPlayerID()
 
 local NEARBY_RADIUS = 1500
 local ability1 = bot:GetAbilityByName('nevermore_shadowraze1')
@@ -143,9 +144,9 @@ function Observation.is_done()
     local _end = false
 
     if GetGameState() == GAME_STATE_POST_GAME or
-            GetHeroKills(this_player_id) > 0 or
-            GetHeroDeaths(this_player_id) > 0 or
-            DotaTime() > 360 then
+            GetHeroKills(bot_player_id) > 0 or
+            GetHeroDeaths(bot_player_id) > 0 or
+            DotaTime() > 300 then
         _end = true
         print('Bot: the game has ended.')
     end
