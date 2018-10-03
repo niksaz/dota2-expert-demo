@@ -1,5 +1,8 @@
 import logging
+import sys
 import time
+
+sys.path.append('../')
 
 from dotaenv import DotaEnvironment
 from policy_gradient import PGAgent
@@ -22,8 +25,8 @@ def create_dota_agent():
 
 def main():
     agent = create_dota_agent()
-    # agent.train_on_replay(epochs=100000, batch_size=1000)
     agent.train()
+    # agent.show_performance()
 
 
 if __name__ == '__main__':

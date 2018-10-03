@@ -2,25 +2,32 @@
 
 import numpy as np
 import tensorflow as tf
+import logging
 
 from policy_gradient.network import Network
 from policy_gradient.replay_buffer import ReplayBuffer
 
+logger = logging.getLogger('DotaRL.PGAgent')
+logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+
+
+def print_network_weights(network):
+    tvars = tf.trainable_variables()
+    tvars_vals = network.session.run(tvars)
+
+    for var, val in zip(tvars, tvars_vals):
+        logger.debug(var.name)
+        logger.debug(val)
+
 
 def main():
-    input_shape = 2
+    input_shape = 3
     output_shape = 16
     replay_buffer = ReplayBuffer()
     network = Network(input_shape=input_shape,
                       output_shape=output_shape,
                       restore=True)
-
-    tvars = tf.trainable_variables()
-    tvars_vals = network.session.run(tvars)
-
-    for var, val in zip(tvars, tvars_vals):
-        print(var.name,
-              val)  # Prints the name of the variable alongside its value.
+    print_network_weights(network)
 
     print("Replays:")
     replay_buffer.load_data()

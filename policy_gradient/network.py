@@ -9,7 +9,7 @@ logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(name)s - %(leve
 
 class Network:
     """
-    MLP classifier for predicting actions by given states.
+    Policy gradient network for predicting actions by a given state.
     """
     __slots__ = ('predict_op',
                  'train_op',
@@ -20,7 +20,7 @@ class Network:
                  'session',
                  'saver')
 
-    def __init__(self, input_shape=172, output_shape=25, learning_rate=0.01,
+    def __init__(self, input_shape, output_shape, learning_rate=0.01,
                  restore=False):
         self.predict_op = None
         self.train_op = None
@@ -37,7 +37,7 @@ class Network:
         if restore:
             self.saver.restore(self.session, 'saved_model/model.ckpt')
 
-    def build(self, input_shape=172, output_shape=25, learning_rate=0.01,
+    def build(self, input_shape, output_shape, learning_rate=0.01,
               layer_shape=8):
         """
         Build action classifier network for policy gradient algorithm.
@@ -55,28 +55,31 @@ class Network:
         self.actions = onehot_actions
         self.rewards = normalized_rewards
 
-        in_layer = tf.Print(input_layer, [input_layer], message='input_layer')
+        in_layer = tf.Print(input_layer, [input_layer], message='input_layer', summarize=input_shape)
 
         # network
         fc1 = tf.layers.dense(inputs=in_layer, units=layer_shape, activation=tf.nn.relu)
-        fc1_print = tf.Print(fc1, [fc1], message='fc1', summarize=80)
+        fc1_print = tf.Print(fc1, [fc1], message='fc1', summarize=layer_shape)
 
-        fc2 = tf.layers.dense(inputs=fc1_print, units=layer_shape, activation=tf.nn.relu)
-        fc2_print = tf.Print(fc2, [fc2], message='fc2', summarize=80)
+        # fc2 = tf.layers.dense(inputs=fc1, units=layer_shape, activation=tf.nn.relu)
+        # fc2_print = tf.Print(fc2, [fc2], message='fc2', summarize=layer_shape)
 
-        fc3 = tf.layers.dense(inputs=fc2_print, units=output_shape, activation=None)
-        fc3_print = tf.Print(fc3, [fc3], message='fc3', summarize=16)
+        fc3 = tf.layers.dense(inputs=fc1_print, units=output_shape, activation=None)
+        fc3_print = tf.Print(fc3, [fc3], message='fc3', summarize=output_shape)
 
         # predict operation
         self.predict_op = tf.nn.softmax(logits=fc3_print)
 
         # loss function
-        neg_log_prob = tf.nn.softmax_cross_entropy_with_logits_v2(logits=fc3_print, labels=self.actions)
+        neg_log_prob = tf.nn.softmax_cross_entropy_with_logits_v2(logits=fc3_print,
+                                                                  labels=self.actions)
         self.loss = tf.reduce_mean(neg_log_prob * self.rewards)
 
         # train operation
         optimizer = tf.train.AdamOptimizer(learning_rate=learning_rate)
-        self.train_op = optimizer.minimize(loss=self.loss)
+        gradients, variables = zip(*optimizer.compute_gradients(loss=self.loss))
+        gradients, _ = tf.clip_by_global_norm(gradients, 5.0)
+        self.train_op = optimizer.apply_gradients(zip(gradients, variables))
 
     def train(self, states, actions, rewards):
         """
@@ -87,26 +90,23 @@ class Network:
         :param actions:  np array of shape (batch_size, output_shape)
         :param rewards: normalized discounted rewards np.array of shape (batch_size, )
         """
-
-        feed_dict = {
-            self.states: states[:, :2],  # TODO TEMP SLICE
+        var_dict = {
+            self.states: states[:, :3],
             self.actions: actions,
             self.rewards: rewards
         }
-        self.session.run(self.train_op, feed_dict=feed_dict)
-        loss = self.session.run(self.loss, feed_dict=feed_dict)
-        logger.debug('Rewards:')
-        logger.debug(rewards)
+        self.session.run(self.train_op, feed_dict=var_dict)
+        loss = self.session.run(self.loss, feed_dict=var_dict)
         logger.debug('Loss:')
         logger.debug(loss)
         self.saver.save(self.session, 'saved_model/model.ckpt')
 
     def predict(self, state):
         """
-        Predict action for single given state.
+        Predict an action for a given state.
 
-        :param state: given state
-        :return: predicted action (number)
+        :param state: a given state
+        :return: the predicted action to take
         """
-        # TODO TEMP SLICE
-        return np.argmax(self.session.run(self.predict_op, feed_dict={self.states: np.array([state[:2]])}))
+        var_dict = {self.states: np.array([state[:3]])}
+        return np.argmax(self.session.run(self.predict_op, feed_dict=var_dict))

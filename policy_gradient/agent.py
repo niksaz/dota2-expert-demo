@@ -5,15 +5,14 @@ import random
 import numpy as np
 from sklearn.preprocessing import OneHotEncoder
 
+from policy_gradient.analyze_run import print_network_weights
 from policy_gradient.network import Network
 from policy_gradient.replay_buffer import ReplayBuffer
 
 logger = logging.getLogger('DotaRL.PGAgent')
 logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 
-# TODO input_shape = 83
-# TODO output_shape = 33
-input_shape = 2
+input_shape = 3
 output_shape = 16
 
 
@@ -31,7 +30,8 @@ class PGAgent:
                  'eps',
                  'rewards')
 
-    def __init__(self, environment, episodes=100, batch_size=100, eps=0.7, discount=0.99, eps_update=0.99):
+    def __init__(self, environment, episodes=100, batch_size=100, eps=0.7,
+                 discount=0.99, eps_update=0.99):
         self.replay_buffer = ReplayBuffer()
         self.network = Network(input_shape=input_shape,
                                output_shape=output_shape,
@@ -48,7 +48,7 @@ class PGAgent:
         self.eps = 0.05
         for episode in range(self.episodes):
             # sample data
-            states, actions, rewards = self.sample_data(steps=self.batch_size)
+            states, actions, rewards = self.sample_episode()
             rewards = np.array(rewards, dtype='float32')
 
             temp = 'Finished episode {ep} with total reward {rew}. eps={eps}'
@@ -63,7 +63,7 @@ class PGAgent:
     def train(self):
         for episode in range(self.episodes):
             # sample data
-            states, actions, rewards = self.sample_data(steps=self.batch_size)
+            states, actions, rewards = self.sample_episode()
             rewards = np.array(rewards, dtype='float32')
 
             temp = 'Finished episode {ep} with total reward {rew}. eps={eps}'
@@ -89,19 +89,21 @@ class PGAgent:
                 for _ in range(10):
                     self.train_network(batch=self.replay_buffer.get_data(self.batch_size))
 
+            print_network_weights(self.network)
+
         logger.debug('Finished training.')
 
-    def sample_data(self, steps=100):
+    def sample_episode(self, max_steps=5000):
         states = []
         actions = []
         rewards = []
         state = self.env.reset()
-        for i in range(steps):
+        for i in range(max_steps):
             action = self.get_action(state=state, eps=self.eps)
             state, terminal, reward = self.env.execute(action=action)
             if terminal:
                 break
-            logger.debug('Step {step} state: {state}, action: {action}.'.format(step=i, rew=reward, action=action, state=state[:2]))
+            logger.debug('Step {step} state: {state}, action: {action}.'.format(step=i, rew=reward, action=action, state=state[:3]))
             states.append(state)
             actions.append(action)
             rewards.append(reward)
@@ -128,11 +130,13 @@ class PGAgent:
 
         mean = np.mean(processed_rewards)
         std = np.std(processed_rewards)
-        processed_rewards = (processed_rewards - mean) / (std)
+        processed_rewards -= mean
+        if abs(std) > 1e-9:
+            processed_rewards /= std
 
         return processed_rewards
 
-    def update_eps(self, coefficient=0.9):
+    def update_eps(self, coefficient):
         self.eps *= coefficient
 
     def train_on_replay(self, batch_size=500, epochs=25):
@@ -163,8 +167,8 @@ class PGAgent:
 
         rewards = np.array(rewards, dtype='float32')
 
-        logger.debug('Training network on batch: states {s_shape}, actions {a_shape}, rewards {r_shape}.\n Reward: {rew}'
-                     .format(s_shape=states.shape, a_shape=actions.shape, r_shape=rewards.shape, rew=rewards))
+        logger.debug('Training network on batch: states {s_shape}, actions {a_shape}, rewards {r_shape}.\n'
+                     .format(s_shape=states.shape, a_shape=actions.shape, r_shape=rewards.shape))
 
         self.replay_buffer.save_data()
         self.network.train(states=states, actions=actions, rewards=rewards)
