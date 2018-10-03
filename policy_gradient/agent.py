@@ -1,12 +1,12 @@
 import logging
 import pickle
-
-from policy_gradient import replay_util
-from policy_gradient.replay_buffer import ReplayBuffer
-from policy_gradient.network import Network
-import numpy as np
 import random
+
+import numpy as np
 from sklearn.preprocessing import OneHotEncoder
+
+from policy_gradient.network import Network
+from policy_gradient.replay_buffer import ReplayBuffer
 
 logger = logging.getLogger('DotaRL.PGAgent')
 logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
@@ -44,6 +44,22 @@ class PGAgent:
         self.eps_update = eps_update
         self.rewards = []
 
+    def show_performance(self):
+        self.eps = 0.05
+        for episode in range(self.episodes):
+            # sample data
+            states, actions, rewards = self.sample_data(steps=self.batch_size)
+            rewards = np.array(rewards, dtype='float32')
+
+            temp = 'Finished episode {ep} with total reward {rew}. eps={eps}'
+            logger.debug(temp.format(ep=episode, rew=np.sum(rewards),
+                                     eps=self.eps))
+
+            self.rewards.extend(rewards)
+
+            with open('saved_rewards', 'wb') as output_file:
+                pickle.dump(obj=self.rewards, file=output_file)
+
     def train(self):
         for episode in range(self.episodes):
             # sample data
@@ -59,19 +75,19 @@ class PGAgent:
             with open('saved_rewards', 'wb') as output_file:
                 pickle.dump(obj=self.rewards, file=output_file)
 
-            # discount and normalize rewards
-            disc_rewards = self.discount_rewards(rewards=rewards, gamma=self.discount)
-            norm_rewards = self.normalize_rewards(rewards=disc_rewards)
+            # preprocess rewards
+            prep_rewards = self.discount_and_normalize_rewards(rewards)
 
             # extend replay buffer with sampled data
-            self.replay_buffer.extend(zip(states, actions, norm_rewards))
+            self.replay_buffer.extend(zip(states, actions, prep_rewards))
 
             # update epsilon
             self.update_eps(coefficient=self.eps_update)
 
             # if there are enough data in replay buffer, train the model on it
             if len(self.replay_buffer) >= self.batch_size:
-                self.train_network(batch=self.replay_buffer.get_data(self.batch_size))
+                for _ in range(10):
+                    self.train_network(batch=self.replay_buffer.get_data(self.batch_size))
 
         logger.debug('Finished training.')
 
@@ -103,28 +119,18 @@ class PGAgent:
         else:
             return random.randint(0, output_shape - 1)
 
-    @staticmethod
-    def discount_rewards(rewards, gamma):
-        """
-        Discount rewards backwards.
-        :param rewards: rewards numpy array
-        :param gamma: discount factor
-        :return: discounted rewards array
-        """
-        running_add = 0.
-        for t in reversed(range(0, len(rewards))):
-            running_add = running_add * gamma + rewards[t]
-            np.put(a=rewards, ind=t, v=running_add)
+    def discount_and_normalize_rewards(self, rewards):
+        processed_rewards = np.zeros_like(rewards)
+        cumulative = 0.0
+        for i in reversed(range(len(rewards))):
+            cumulative = cumulative * self.discount + rewards[i]
+            processed_rewards[i] = cumulative
 
-        return rewards
+        mean = np.mean(processed_rewards)
+        std = np.std(processed_rewards)
+        processed_rewards = (processed_rewards - mean) / (std)
 
-    @staticmethod
-    def normalize_rewards(rewards):
-        mean = np.mean(rewards)
-        std = np.std(rewards)
-        rewards -= mean
-        rewards /= std
-        return rewards
+        return processed_rewards
 
     def update_eps(self, coefficient=0.9):
         self.eps *= coefficient

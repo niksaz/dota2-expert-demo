@@ -55,26 +55,28 @@ class Network:
         self.actions = onehot_actions
         self.rewards = normalized_rewards
 
+        in_layer = tf.Print(input_layer, [input_layer], message='input_layer')
+
         # network
-        layer1 = tf.layers.dense(inputs=input_layer, units=layer_shape, activation=tf.nn.relu)
-        layer2 = tf.layers.dense(inputs=layer1, units=layer_shape, activation=tf.nn.relu)
-        # layer3 = tf.layers.dense(inputs=layer2, units=layer_shape, activation=tf.nn.selu)
-        # layer4 = tf.layers.dense(inputs=layer3, units=layer_shape, activation=tf.nn.selu)
+        fc1 = tf.layers.dense(inputs=in_layer, units=layer_shape, activation=tf.nn.relu)
+        fc1_print = tf.Print(fc1, [fc1], message='fc1', summarize=80)
 
-        # output TODO activation
-        logits = tf.layers.dense(inputs=layer2, units=output_shape, activation=tf.nn.relu)
+        fc2 = tf.layers.dense(inputs=fc1_print, units=layer_shape, activation=tf.nn.relu)
+        fc2_print = tf.Print(fc2, [fc2], message='fc2', summarize=80)
 
-        # loss
-        ce = tf.losses.softmax_cross_entropy(onehot_labels=onehot_actions, logits=logits)
-        loss = tf.multiply(ce, normalized_rewards)
-        self.loss = loss
+        fc3 = tf.layers.dense(inputs=fc2_print, units=output_shape, activation=None)
+        fc3_print = tf.Print(fc3, [fc3], message='fc3', summarize=16)
 
         # predict operation
-        self.predict_op = tf.nn.softmax(logits=logits)
+        self.predict_op = tf.nn.softmax(logits=fc3_print)
+
+        # loss function
+        neg_log_prob = tf.nn.softmax_cross_entropy_with_logits_v2(logits=fc3_print, labels=self.actions)
+        self.loss = tf.reduce_mean(neg_log_prob * self.rewards)
 
         # train operation
-        optimizer = tf.train.GradientDescentOptimizer(learning_rate=learning_rate)
-        self.train_op = optimizer.minimize(loss=loss)
+        optimizer = tf.train.AdamOptimizer(learning_rate=learning_rate)
+        self.train_op = optimizer.minimize(loss=self.loss)
 
     def train(self, states, actions, rewards):
         """
@@ -93,6 +95,8 @@ class Network:
         }
         self.session.run(self.train_op, feed_dict=feed_dict)
         loss = self.session.run(self.loss, feed_dict=feed_dict)
+        logger.debug('Rewards:')
+        logger.debug(rewards)
         logger.debug('Loss:')
         logger.debug(loss)
         self.saver.save(self.session, 'saved_model/model.ckpt')

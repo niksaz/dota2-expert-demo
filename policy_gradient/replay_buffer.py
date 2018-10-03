@@ -1,9 +1,9 @@
 import itertools
 import os
+import pickle
+import random
 from collections import deque
 from random import shuffle
-import pickle
-import numpy as np
 
 
 class ReplayBuffer:
@@ -12,7 +12,7 @@ class ReplayBuffer:
     """
     __slots__ = ('data', 'filename')
 
-    def __init__(self, directory='./', max_size=10000000):
+    def __init__(self, directory='./', max_size=1000000):
         """
         Create new buffer with given params.
         :param directory: directory to work in
@@ -57,12 +57,14 @@ class ReplayBuffer:
 
     def get_data(self, batch_size):
         """
-        Get batch of data.
+        Get randomly sampled batch of data from the buffer.
         :param batch_size: batch size
         :return: 3 iterators: states, actions, rewards
         """
         size = len(self.data)
-        data = list(itertools.islice(self.data, size - batch_size, size))
+        idx_data = set(random.sample(range(size), batch_size))
+        data = [elem for i, elem in enumerate(self.data) if i in idx_data]
+
         return [s for s, a, r in data], \
                [a for s, a, r in data], \
                [r for s, a, r in data]

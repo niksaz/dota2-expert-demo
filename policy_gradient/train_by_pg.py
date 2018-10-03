@@ -15,6 +15,7 @@ logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(name)s - %(leve
 def create_dota_agent():
     return PGAgent(environment=DotaEnvironment,
                    episodes=3000,
+                   eps=0.7,
                    batch_size=200,
                    eps_update=0.999)
 
