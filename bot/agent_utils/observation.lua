@@ -20,17 +20,26 @@ function get_damage_info()
     return damage_info
 end
 
+function get_ally_tower()
+    if GetTeam() == TEAM_RADIANT then
+        return GetTower(TEAM_RADIANT, TOWER_MID_1)
+    else
+        return GetTower(TEAM_DIRE, TOWER_MID_1)
+    end
+end
+
+function get_enemy_tower()
+    if GetTeam == TEAM_DIRE then
+        return GetTower(TEAM_DIRE, TOWER_MID_1)
+    else
+        return GetTower(TEAM_RADIANT, TOWER_MID_1)
+    end
+end
+
 -- Obtain towers' info.
 function get_towers_info()
-    local ally_tower, enemy_tower
-    if GetTeam() == TEAM_RADIANT then
-        ally_tower = GetTower(TEAM_RADIANT, TOWER_MID_1)
-        enemy_tower = GetTower(TEAM_DIRE, TOWER_MID_1)
-    else
-        ally_tower = GetTower(TEAM_DIRE, TOWER_MID_1)
-        enemy_tower = GetTower(TEAM_RADIANT, TOWER_MID_1)
-    end
-
+    local ally_tower = get_ally_tower()
+    local enemy_tower = get_enemy_tower()
     return {
         enemy_tower:GetHealth(),
         ally_tower:GetHealth()
@@ -64,11 +73,11 @@ function get_self_info()
     local self_info = {
         self_position[1],
         self_position[2],
+        bot:GetFacing(),
         bot:GetAttackDamage(),
         bot:GetLevel(),
         bot:GetHealth(),
         bot:GetMana(),
-        bot:GetFacing(),
         ability1_dmg,
         ability2_dmg,
         ability3_dmg,
@@ -146,7 +155,8 @@ function Observation.is_done()
     if GetGameState() == GAME_STATE_POST_GAME or
             GetHeroKills(bot_player_id) > 0 or
             GetHeroDeaths(bot_player_id) > 0 or
-            DotaTime() > 300 then
+            DotaTime() > 300 or
+            GetUnitToUnitDistance(bot, get_ally_tower()) < 300 then
         _end = true
         print('Bot: the game has ended.')
     end
