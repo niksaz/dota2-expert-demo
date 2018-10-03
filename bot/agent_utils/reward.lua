@@ -119,15 +119,25 @@ function Reward.get_reward(wrong_action)
     local ally_tower_health = get_ally_tower_health()
     local hits = get_last_hits()
 
-    local reward = -(my_deaths - last_deaths) * 10000 -- deaths
-            + (my_kills - last_kills) * 1000000 -- kills
-            + max(enemy_tower_health - last_enemy_tower_health, 0) * 5 * is_near_enemy_tower() -- enemy tower
-            - max(ally_tower_health - last_ally_tower_health, 0)
-            + max(enemy_health - last_enemy_health, 0) * 100 * recently_damaged_enemy()
-            - max(my_health - last_my_health, 0) * 100
-            + max(hits - last_hits, 0) * 10000
-            - get_distance_to_tower_punishment() / 200
-            - wrong_action * 30
+--    local reward = -(my_deaths - last_deaths) * 10000 -- deaths
+--            + (my_kills - last_kills) * 1000000 -- kills
+--            + max(enemy_tower_health - last_enemy_tower_health, 0) * 5 * is_near_enemy_tower() -- enemy tower
+--            - max(ally_tower_health - last_ally_tower_health, 0)
+--            + max(enemy_health - last_enemy_health, 0) * 100 * recently_damaged_enemy()
+--            - max(my_health - last_my_health, 0) * 100
+--            + max(hits - last_hits, 0) * 10000
+--            - get_distance_to_tower_punishment() / 200
+--            - wrong_action * 30
+
+    local reward = 0
+    local tower = GetTower(TEAM_RADIANT, TOWER_MID_1)
+    local to_tower_distance = GetUnitToUnitDistance(bot, tower)
+    if last_to_tower_distance ~= nil then
+        reward = reward + last_to_tower_distance - to_tower_distance
+    end
+    last_to_tower_distance = to_tower_distance
+
+    reward = reward - (my_deaths - last_deaths) * 10000 -- deaths
 
     last_enemy_tower_health = enemy_tower_health
     last_ally_tower_health = ally_tower_health
@@ -137,32 +147,7 @@ function Reward.get_reward(wrong_action)
     last_my_health = my_health
     last_enemy_health = enemy_health
 
-    local tower = GetTower(TEAM_RADIANT, TOWER_MID_1)
-    local to_tower_distance = GetUnitToUnitDistance(bot, tower)
-    print('last_to_tower_distance: ', last_to_tower_distance)
-    print('to_tower_distance: ', to_tower_distance)
-    if last_to_tower_distance == nil then
-        reward = 0
-    else
-        reward = last_to_tower_distance - to_tower_distance
-    end
-    last_to_tower_distance = to_tower_distance
-
     print('reward: ', reward)
-    return reward
-end
-
-local target = GetTower(TEAM_RADIANT, TOWER_MID_1);
-
-function Reward.get_distance_to_tower()
-    return GetUnitToUnitDistance(bot, target)
-end
-
--- TODO
-function Reward.tower_distance_reward()
-    local reward = GetUnitToUnitDistance(bot, target)
-    reward = math.exp(-0.002 * reward + 30)
-    print('Reward: ', reward)
     return reward
 end
 

@@ -85,8 +85,6 @@ end
 function send_observation_message()
     local _end = false
 
-    --or (GameTime() - Action.last_time_moved()) > 5
-
     if GetGameState() == GAME_STATE_POST_GAME or
             GetHeroKills(this_player_id) > 0 or
             GetHeroDeaths(this_player_id) > 0 or
