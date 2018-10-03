@@ -44,7 +44,7 @@ end
 --- Send JSON message to bot server.
 -- @param json_message message to send
 -- @param route route ('/what_next' or '/observation')
--- @param callback on responce received callback
+-- @param callback called after response is received
 --
 function send_message(json_message, route, callback)
     local req = CreateHTTPRequest(':5000' .. route)
@@ -53,12 +53,12 @@ function send_message(json_message, route, callback)
         for k, v in pairs(result) do
             if k == 'Body' then
                 if v ~= '' then
-                    local responce = Json.Decode(v)
+                    local response = Json.Decode(v)
                     if callback ~= nil then
-                        callback(responce)
+                        callback(response)
                     end
-                    current_action = responce['action']
-                    fsm_state = responce['fsm_state']
+                    current_action = response['action']
+                    fsm_state = response['fsm_state']
                 else
                     fsm_state = WHAT_NEXT
                 end
@@ -74,29 +74,13 @@ function send_what_next_message()
     send_message(message, '/what_next', nil)
 end
 
---- MODIFY THIS to modify reward
---
-function get_reward()
-     return Reward.get_reward(wrong_action)
-end
-
 --- Send JSON with current state info.
 --
 function send_observation_message()
-    local _end = false
-
-    if GetGameState() == GAME_STATE_POST_GAME or
-            GetHeroKills(this_player_id) > 0 or
-            GetHeroDeaths(this_player_id) > 0 or
-            DotaTime() > 350 then
-        _end = true
-        print('Bot: the game has ended.')
-    end
-
     local msg = {
         ['observation'] = Observation.get_observation(),
-        ['reward'] = get_reward(),
-        ['done'] = _end,
+        ['reward'] = Reward.get_reward(wrong_action),
+        ['done'] = Observation.is_done(),
         ['state_num'] = state_num
     }
 

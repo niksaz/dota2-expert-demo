@@ -103,8 +103,6 @@ end
 -- @param creeps to retrieve info from
 --
 function get_creeps_info(creeps)
-    print('get_creeps_info', creeps)
-
     local creeps_info = {}
     for _, creep in pairs(creeps) do
         local position = creep:GetLocation()
@@ -139,6 +137,20 @@ function Observation.get_observation()
     }
 
     return observation
+end
+
+function Observation.is_done()
+    local _end = false
+
+    if GetGameState() == GAME_STATE_POST_GAME or
+            GetHeroKills(this_player_id) > 0 or
+            GetHeroDeaths(this_player_id) > 0 or
+            DotaTime() > 360 then
+        _end = true
+        print('Bot: the game has ended.')
+    end
+
+    return _end
 end
 
 return Observation;
