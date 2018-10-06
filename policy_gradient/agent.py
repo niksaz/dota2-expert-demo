@@ -48,24 +48,18 @@ class PGAgent:
         self.eps = 0.05
         for episode in range(self.episodes):
             # sample data
-            states, actions, rewards = self.sample_episode()
+            states, actions, rewards = self.sample_episode(batch_size=self.batch_size)
             rewards = np.array(rewards, dtype='float32')
 
             temp = 'Finished episode {ep} with total reward {rew}. eps={eps}'
             logger.debug(temp.format(ep=episode, rew=np.sum(rewards),
                                      eps=self.eps))
-
-            self.rewards.extend(rewards)
-
-            with open('saved_rewards', 'wb') as output_file:
-                pickle.dump(obj=self.rewards, file=output_file)
 
     def train(self):
         for episode in range(self.episodes):
             # sample data
-            states, actions, rewards = self.sample_episode()
+            states, actions, rewards = self.sample_episode(batch_size=self.batch_size)
             rewards = np.array(rewards, dtype='float32')
-
             temp = 'Finished episode {ep} with total reward {rew}. eps={eps}'
             logger.debug(temp.format(ep=episode, rew=np.sum(rewards),
                                      eps=self.eps))
@@ -75,16 +69,17 @@ class PGAgent:
             with open('saved_rewards', 'wb') as output_file:
                 pickle.dump(obj=self.rewards, file=output_file)
 
-            # preprocess rewards
-            prep_rewards = self.discount_and_normalize_rewards(rewards)
+            # Preprocess rewards
+            disc_rewards = self.disc_rewards(rewards)
+            norm_rewards = self.normalize_rewards(disc_rewards)
 
-            # extend replay buffer with sampled data
-            self.replay_buffer.extend(zip(states, actions, prep_rewards))
+            # Extend replay buffer with sampled data
+            self.replay_buffer.extend(zip(states, actions, norm_rewards))
 
-            # update epsilon
-            self.update_eps(coefficient=self.eps_update)
+            # Update the parameter for epsilon-greedy strategy
+            self.eps *= self.eps_update
 
-            # if there are enough data in replay buffer, train the model on it
+            # If there is enough data in replay buffer, train the model on it
             if len(self.replay_buffer) >= self.batch_size:
                 for _ in range(10):
                     self.train_network(batch=self.replay_buffer.get_data(self.batch_size))
@@ -93,12 +88,12 @@ class PGAgent:
 
         logger.debug('Finished training.')
 
-    def sample_episode(self, max_steps=5000):
+    def sample_episode(self, batch_size):
         states = []
         actions = []
         rewards = []
         state = self.env.reset()
-        for i in range(max_steps):
+        for i in range(batch_size):
             action = self.get_action(state=state, eps=self.eps)
             state, terminal, reward = self.env.execute(action=action)
             if terminal:
@@ -121,23 +116,22 @@ class PGAgent:
         else:
             return random.randint(0, output_shape - 1)
 
-    def discount_and_normalize_rewards(self, rewards):
-        processed_rewards = np.zeros_like(rewards)
+    def disc_rewards(self, rewards):
+        disc_rewards = np.zeros_like(rewards)
         cumulative = 0.0
         for i in reversed(range(len(rewards))):
             cumulative = cumulative * self.discount + rewards[i]
-            processed_rewards[i] = cumulative
+            disc_rewards[i] = cumulative
+        return disc_rewards
 
-        mean = np.mean(processed_rewards)
-        std = np.std(processed_rewards)
-        processed_rewards -= mean
+    def normalize_rewards(self, rewards):
+        norm_rewards = np.copy(rewards)
+        mean = np.mean(norm_rewards)
+        std = np.std(norm_rewards)
+        norm_rewards -= mean
         if abs(std) > 1e-9:
-            processed_rewards /= std
-
-        return processed_rewards
-
-    def update_eps(self, coefficient):
-        self.eps *= coefficient
+            norm_rewards /= std
+        return norm_rewards
 
     def train_on_replay(self, batch_size=500, epochs=25):
         self.replay_buffer.load_data()

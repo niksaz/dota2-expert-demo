@@ -38,7 +38,7 @@ class Network:
             self.saver.restore(self.session, 'saved_model/model.ckpt')
 
     def build(self, input_shape, output_shape, learning_rate=0.01,
-              layer_shape=8):
+              layer_shape=9):
         """
         Build action classifier network for policy gradient algorithm.
 

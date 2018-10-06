@@ -130,15 +130,12 @@ function Reward.get_reward(wrong_action)
 --            - wrong_action * 30
 
     local reward = 0
-    local tower = GetTower(TEAM_RADIANT, TOWER_MID_1)
-    local to_tower_distance = GetUnitToUnitDistance(bot, tower)
+    local to_tower_distance = GetUnitToUnitDistance(bot, ally_tower)
     if last_to_tower_distance ~= nil then
         reward = reward + last_to_tower_distance - to_tower_distance
     end
+
     last_to_tower_distance = to_tower_distance
-
-    reward = reward - (my_deaths - last_deaths) * 10000 -- deaths
-
     last_enemy_tower_health = enemy_tower_health
     last_ally_tower_health = ally_tower_health
     last_deaths = my_deaths

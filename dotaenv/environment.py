@@ -23,7 +23,7 @@ class DotaEnvironment(Environment):
         if self.terminal:
             restart_game()
             self.terminal = False
-            time.sleep(5)
+            time.sleep(10)
         return server.get_observation()[0]
 
     def execute(self, action):
