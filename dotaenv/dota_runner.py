@@ -30,13 +30,13 @@ def restart_game():
 
 def start_game():
     # start
-    gui.click(x=1200, y=850, pause=0.5)
+    gui.click(x=1200, y=810, pause=0.5)
     # create lobby
-    gui.click(x=1170, y=275, pause=2)
+    gui.click(x=1120, y=300, pause=2)
     # join coaches
-    gui.click(x=1100, y=365, pause=2)
+    gui.click(x=1055, y=370, pause=2)
     # start game
-    gui.click(x=1250, y=850, pause=1)
+    gui.click(x=1200, y=810, pause=1)
 
 
 def set_timescale():
