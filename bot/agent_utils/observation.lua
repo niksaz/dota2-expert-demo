@@ -155,8 +155,7 @@ function Observation.is_done()
     if GetGameState() == GAME_STATE_POST_GAME or
             GetHeroKills(bot_player_id) > 0 or
             GetHeroDeaths(bot_player_id) > 0 or
-            DotaTime() > 300 or
-            GetUnitToUnitDistance(bot, get_ally_tower()) < 300 then
+            DotaTime() > 300 then
         _end = true
         print('Bot: the game has ended.')
     end

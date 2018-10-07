@@ -130,7 +130,7 @@ function Reward.get_reward(wrong_action)
 --            - wrong_action * 30
 
     local reward = 0
-    local to_tower_distance = GetUnitToUnitDistance(bot, ally_tower)
+    local to_tower_distance = GetUnitToUnitDistance(bot, enemy_tower)
     if last_to_tower_distance ~= nil then
         reward = reward + last_to_tower_distance - to_tower_distance
     end
