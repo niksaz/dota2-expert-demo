@@ -5,7 +5,7 @@ import random
 import numpy as np
 from sklearn.preprocessing import OneHotEncoder
 
-from policy_gradient.analyze_run import print_network_weights
+from policy_gradient.analyze_model import print_network_weights
 from policy_gradient.network import Network
 from policy_gradient.replay_buffer import ReplayBuffer
 
@@ -28,27 +28,33 @@ class PGAgent:
                  'batch_size',
                  'eps_update',
                  'eps',
-                 'rewards')
+                 'total_rewards')
 
     def __init__(self, environment, episodes=100, batch_size=100, eps=0.7,
-                 discount=0.99, eps_update=0.99):
+                 discount=0.99, eps_update=0.99, restore=False):
         self.replay_buffer = ReplayBuffer()
         self.network = Network(input_shape=input_shape,
                                output_shape=output_shape,
-                               restore=False)
+                               restore=restore)
         self.env = environment()
         self.episodes = episodes
         self.batch_size = batch_size
         self.eps = eps
         self.discount = discount
         self.eps_update = eps_update
-        self.rewards = []
+        if restore:
+            self.replay_buffer.load_data()
+            with open('saved_rewards.pkl', 'rb') as input_file:
+                self.total_rewards = pickle.load(input_file)
+        else:
+            self.total_rewards = []
 
     def show_performance(self):
         self.eps = 0.05
         for episode in range(self.episodes):
             # sample data
-            states, actions, rewards = self.sample_episode(batch_size=self.batch_size)
+            states, actions, rewards, terminal = self.sample_episode(
+                batch_size=self.batch_size)
             rewards = np.array(rewards, dtype='float32')
 
             temp = 'Finished episode {ep} with total reward {rew}. eps={eps}'
@@ -56,18 +62,25 @@ class PGAgent:
                                      eps=self.eps))
 
     def train(self):
+        episode_rewards = []
         for episode in range(self.episodes):
             # sample data
-            states, actions, rewards = self.sample_episode(batch_size=self.batch_size)
+            states, actions, rewards, terminal = self.sample_episode(
+                batch_size=self.batch_size)
+            episode_rewards.extend(rewards)
+
+            if terminal:
+                disc_rewards = self.disc_rewards(episode_rewards)
+                episode_rewards = []
+                total_reward = np.sum(disc_rewards)
+                self.total_rewards.append(total_reward)
+                with open('saved_rewards.pkl', 'wb') as output_file:
+                    pickle.dump(obj=self.total_rewards, file=output_file)
+
             rewards = np.array(rewards, dtype='float32')
             temp = 'Finished episode {ep} with total reward {rew}. eps={eps}'
             logger.debug(temp.format(ep=episode, rew=np.sum(rewards),
                                      eps=self.eps))
-
-            self.rewards.extend(rewards)
-
-            with open('saved_rewards', 'wb') as output_file:
-                pickle.dump(obj=self.rewards, file=output_file)
 
             # Preprocess rewards
             disc_rewards = self.disc_rewards(rewards)
@@ -92,18 +105,20 @@ class PGAgent:
         states = []
         actions = []
         rewards = []
+        terminal = False
         state = self.env.reset()
         for i in range(batch_size):
             action = self.get_action(state=state, eps=self.eps)
-            state, terminal, reward = self.env.execute(action=action)
-            if terminal:
+            state, terminal_action, reward = self.env.execute(action=action)
+            terminal = terminal_action
+            if terminal_action:
                 break
             logger.debug('Step {step} state: {state}, action: {action}.'.format(step=i, rew=reward, action=action, state=state[:3]))
             states.append(state)
             actions.append(action)
             rewards.append(reward)
 
-        return states, actions, rewards
+        return states, actions, rewards, terminal
 
     def get_action(self, state, eps):
         """

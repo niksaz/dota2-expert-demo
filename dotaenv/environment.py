@@ -11,8 +11,8 @@ from dotaenv.dota_runner import start_game, set_timescale, launch_dota, \
 class DotaEnvironment(Environment):
 
     def __init__(self):
-        self.action_space = (21,)
-        self.observation_space = (172,)
+        self.action_space = (16,)
+        self.observation_space = (83,)
         self.terminal = False
         server.run_app()
         launch_dota()
@@ -33,13 +33,8 @@ class DotaEnvironment(Environment):
 
     @property
     def states(self):
-        return dict(type='float', shape=(172,))
+        return dict(type='float', shape=self.observation_space)
 
     @property
     def actions(self):
-        return dict(
-            action_type=dict(type='int', num_actions=5),
-            move_vector=dict(type='int', num_actions=16),
-            creep_index=dict(type='int', num_actions=10),
-            ability_index=dict(type='int', num_actions=4)
-        )
+        return dict(type='int', num_actions=self.action_space[0])

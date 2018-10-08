@@ -52,7 +52,7 @@ def step(action):
     current_action = action_to_json(action)
     lock.release()
 
-    observation_received.wait()
+    observation_received.wait(timeout=30)
     result = observation
     observation = None
     observation_received.clear()
