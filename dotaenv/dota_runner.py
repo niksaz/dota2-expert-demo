@@ -8,7 +8,7 @@ def launch_dota():
     gui.hotkey('command', 'space')
     time.sleep(1)
 
-    # search for steam (assumes it is already launched)
+    # search for steam (assuming it is already launched)
     gui.typewrite('steam', interval=0.1)
     gui.press('enter')
     time.sleep(1)

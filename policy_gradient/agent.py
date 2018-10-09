@@ -50,11 +50,10 @@ class PGAgent:
             self.total_rewards = []
 
     def show_performance(self):
-        self.eps = 0.05
         for episode in range(self.episodes):
             # sample data
             states, actions, rewards, terminal = self.sample_episode(
-                batch_size=self.batch_size)
+                batch_size=self.batch_size, eps=0.00)
             rewards = np.array(rewards, dtype='float32')
 
             temp = 'Finished episode {ep} with total reward {rew}. eps={eps}'
@@ -66,13 +65,17 @@ class PGAgent:
         for episode in range(self.episodes):
             # sample data
             states, actions, rewards, terminal = self.sample_episode(
-                batch_size=self.batch_size)
+                batch_size=self.batch_size, eps=self.eps)
             episode_rewards.extend(rewards)
 
             if terminal:
                 disc_rewards = self.disc_rewards(episode_rewards)
                 episode_rewards = []
                 total_reward = np.sum(disc_rewards)
+
+                if total_reward == 0:
+                    # The game was restarted right after it started
+                    continue
                 self.total_rewards.append(total_reward)
                 with open('saved_rewards.pkl', 'wb') as output_file:
                     pickle.dump(obj=self.total_rewards, file=output_file)
@@ -94,21 +97,20 @@ class PGAgent:
 
             # If there is enough data in replay buffer, train the model on it
             if len(self.replay_buffer) >= self.batch_size:
-                for _ in range(10):
-                    self.train_network(batch=self.replay_buffer.get_data(self.batch_size))
+                self.train_network(batch=self.replay_buffer.get_data(self.batch_size))
 
             print_network_weights(self.network)
 
         logger.debug('Finished training.')
 
-    def sample_episode(self, batch_size):
+    def sample_episode(self, batch_size, eps):
         states = []
         actions = []
         rewards = []
         terminal = False
         state = self.env.reset()
         for i in range(batch_size):
-            action = self.get_action(state=state, eps=self.eps)
+            action = self.get_action(state=state, eps=eps)
             state, terminal_action, reward = self.env.execute(action=action)
             terminal = terminal_action
             if terminal_action:

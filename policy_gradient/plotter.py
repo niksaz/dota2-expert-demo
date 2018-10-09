@@ -11,6 +11,7 @@ def plot_saved_rewards():
     for r in reward:
         if r != 0:
             non_zero_rewards.append(r)
+    print('Number of non-zero rewards is', len(non_zero_rewards))
 
     plt.plot(non_zero_rewards)
     plt.title('Reward per episode')

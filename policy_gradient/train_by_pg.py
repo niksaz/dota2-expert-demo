@@ -17,11 +17,11 @@ logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(name)s - %(leve
 
 def create_dota_agent():
     return PGAgent(environment=DotaEnvironment,
-                   episodes=3000,
-                   restore=True,
-                   batch_size=200,
-                   eps=0.7,
-                   eps_update=0.99)
+                   episodes=10000,
+                   restore=False,
+                   batch_size=100,
+                   eps=1.00,
+                   eps_update=0.999)
 
 
 def main():
