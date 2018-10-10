@@ -1,5 +1,7 @@
 Reward = {}
 
+local DISCOUNT_FACTOR = 0.999
+
 local bot = GetBot()
 
 local enemy_tower = GetTower(TEAM_DIRE, TOWER_MID_1);
@@ -101,23 +103,23 @@ function recently_damaged_enemy()
 end
 
 function is_near_enemy_tower()
-    if GetUnitToUnitDistance(bot, enemy_tower) < 1000 then
+    if GetUnitToUnitDistance(bot, enemy_tower) < 500 then
         return 1
     else
         return 0
     end
 end
 
-local last_to_tower_distance;
+local was_near_enemy_tower = 0
+local old_potential = -GetUnitToUnitDistance(bot, enemy_tower)
 
 function Reward.get_reward(wrong_action)
-    local my_health = get_my_health()
-    local my_deaths = get_my_deaths()
-    local my_kills = get_my_kills()
-    local enemy_health = get_enemy_health()
-    local enemy_tower_health = get_enemy_tower_health()
-    local ally_tower_health = get_ally_tower_health()
-    local hits = get_last_hits()
+--    local my_health = get_my_health()
+--    local my_kills = get_my_kills()
+--    local enemy_health = get_enemy_health()
+--    local enemy_tower_health = get_enemy_tower_health()
+--    local ally_tower_health = get_ally_tower_health()
+--    local hits = get_last_hits()
 
 --    local reward = -(my_deaths - last_deaths) * 10000 -- deaths
 --            + (my_kills - last_kills) * 1000000 -- kills
@@ -129,20 +131,24 @@ function Reward.get_reward(wrong_action)
 --            - get_distance_to_tower_punishment() / 200
 --            - wrong_action * 30
 
-    local reward = 0
-    local to_tower_distance = GetUnitToUnitDistance(bot, enemy_tower)
-    if last_to_tower_distance ~= nil then
-        reward = reward + last_to_tower_distance - to_tower_distance
-    end
 
-    last_to_tower_distance = to_tower_distance
-    last_enemy_tower_health = enemy_tower_health
-    last_ally_tower_health = ally_tower_health
+    local new_potential = -GetUnitToUnitDistance(bot, enemy_tower)
+    local reward = DISCOUNT_FACTOR * new_potential - old_potential
+    old_potential = new_potential
+
+    local my_deaths = get_my_deaths()
+    if (is_near_enemy_tower() - was_near_enemy_tower == 1) then
+        reward = reward + 100000
+        was_near_enemy_tower = 1
+    end
     last_deaths = my_deaths
-    last_kills = my_kills
-    last_hits = hits
-    last_my_health = my_health
-    last_enemy_health = enemy_health
+
+--    last_enemy_tower_health = enemy_tower_health
+--    last_ally_tower_health = ally_tower_health
+--    last_kills = my_kills
+--    last_hits = hits
+--    last_my_health = my_health
+--    last_enemy_health = enemy_health
 
     print('reward: ', reward)
     return reward
