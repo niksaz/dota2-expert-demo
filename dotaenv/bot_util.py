@@ -49,7 +49,6 @@ def action_to_json(action):
     return action_response
 
 
-# TODO
 def message_to_observation(observation_message):
     """
     Transform bot observation message to
@@ -64,7 +63,7 @@ def message_to_observation(observation_message):
         observation = []
         reward = 0.
         done = True
-    return observation, reward, done
+    return observation[:3], reward, done  # TODO: Taking prefix slice.
 
 
 def vectorize_observation(observation):

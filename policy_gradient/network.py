@@ -91,7 +91,7 @@ class Network:
         :param rewards: normalized discounted rewards np.array of shape (batch_size, )
         """
         var_dict = {
-            self.states: states[:, :3],
+            self.states: states,
             self.actions: actions,
             self.rewards: rewards
         }
@@ -108,5 +108,5 @@ class Network:
         :param state: a given state
         :return: the predicted action to take
         """
-        var_dict = {self.states: np.array([state[:3]])}
+        var_dict = {self.states: np.array([state])}
         return np.argmax(self.session.run(self.predict_op, feed_dict=var_dict))

@@ -1,5 +1,6 @@
 # /usr/bin/env python3
 import time
+import pyautogui as gui
 
 from tensorforce.environments import Environment
 
@@ -24,12 +25,17 @@ class DotaEnvironment(Environment):
             restart_game()
             self.terminal = False
             time.sleep(10)
+            gui.press('esc', pause=1)
+            gui.press('esc', pause=1)
+            gui.press('esc', pause=1)
+            gui.press('esc', pause=1)
+            gui.press('esc', pause=1)
         return server.get_observation()[0]
 
     def execute(self, action):
         state, reward, terminal = server.step(action=action)
         self.terminal = terminal
-        return state, terminal, reward
+        return state, reward, terminal
 
     @property
     def states(self):
