@@ -1,4 +1,5 @@
 # /usr/bin/env python3
+import subprocess
 import time
 import pyautogui as gui
 
@@ -16,7 +17,9 @@ class DotaEnvironment(Environment):
         self.observation_space = (83,)
         self.terminal = False
         server.run_app()
-        launch_dota()
+        # If the app is running there is no need to launch it again
+        if DotaEnvironment.find_process("dota").find(b"dota 2 beta") == -1:
+            launch_dota()
         set_timescale()
         start_game()
 
@@ -44,3 +47,12 @@ class DotaEnvironment(Environment):
     @property
     def actions(self):
         return dict(type='int', num_actions=self.action_space[0])
+
+    @staticmethod
+    def find_process(process_name):
+        ps = subprocess.Popen("ps -ef | grep " + process_name,
+                              shell=True, stdout=subprocess.PIPE)
+        output = ps.stdout.read()
+        ps.stdout.close()
+        ps.wait()
+        return output

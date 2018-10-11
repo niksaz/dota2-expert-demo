@@ -115,7 +115,7 @@ class PGAgent:
             terminal = terminal_action
             if terminal_action:
                 break
-            logger.debug('Step {step} state: {state}, action: {action}.'.format(step=i, rew=reward, action=action, state=state[:3]))
+            logger.debug('Step {step} state: {state}, action: {action}.'.format(step=i, rew=reward, action=action, state=state))
             states.append(state)
             actions.append(action)
             rewards.append(reward)
