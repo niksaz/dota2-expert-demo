@@ -5,7 +5,6 @@ sys.path.append('../')
 
 from dotaenv import DotaEnvironment
 
-import matplotlib.pyplot as plt
 from tensorforce.agents import PPOAgent
 from tensorforce.execution import Runner
 
@@ -25,7 +24,6 @@ network_spec = [
     dict(type='dense', size=9),
     dict(type='nonlinearity', name='relu'),
     dict(type='dense', size=16),
-    dict(type='nonlinearity', name='relu')
 ]
 
 agent = PPOAgent(
@@ -33,14 +31,13 @@ agent = PPOAgent(
     actions=env.actions,
     network=network_spec,
     update_mode=dict(
-        batch_size=10,
+        batch_size=100,
     ),
     # PPOAgent
     step_optimizer=dict(
         type='adam',
         learning_rate=1e-3
     ),
-    optimization_steps=10,
     # Model
     scope='ppo',
     discount=0.99,
@@ -57,7 +54,13 @@ agent = PPOAgent(
     baseline_optimizer=None,
     gae_lambda=None,
     # PGLRModel
-    likelihood_ratio_clipping=0.2
+    actions_exploration=dict(
+        type='epsilon_decay',
+        initial_epsilon=1.0,
+        final_epsilon=0.05,
+        timesteps=500000,
+    ),
+    likelihood_ratio_clipping=0.2,
 )
 
 # Create the runner
@@ -81,13 +84,6 @@ def episode_finished(r):
 runner.run(episodes=200, max_episode_timesteps=10000,
            episode_finished=episode_finished)
 runner.close()
-
-plt.plot(runner.episode_rewards)
-plt.title('Reward per episode')
-plt.xlabel('Episode')
-plt.ylabel('Reward')
-plt.savefig('graph.png')
-plt.show()
 
 # Print statistics
 print("Learning finished. Total episodes: {ep}.".format(ep=runner.episode))
