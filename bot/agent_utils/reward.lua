@@ -110,8 +110,13 @@ function is_near_enemy_tower()
     end
 end
 
+function get_state_potential()
+    local dst = max(1, GetUnitToUnitDistance(bot, enemy_tower))
+    return 1/dst
+end
+
 local was_near_enemy_tower = 0
-local old_potential = -GetUnitToUnitDistance(bot, enemy_tower)
+local old_potential = get_state_potential()
 
 function Reward.get_reward(wrong_action)
 --    local my_health = get_my_health()
@@ -132,7 +137,7 @@ function Reward.get_reward(wrong_action)
 --            - wrong_action * 30
 
 
-    local new_potential = -GetUnitToUnitDistance(bot, enemy_tower)
+    local new_potential = get_state_potential()
     local reward = DISCOUNT_FACTOR * new_potential - old_potential
     old_potential = new_potential
 
