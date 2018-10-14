@@ -28,11 +28,11 @@ class DotaEnvironment(Environment):
             restart_game()
             self.terminal = False
             time.sleep(10)
-            gui.press('esc', pause=1)
-            gui.press('esc', pause=1)
-            gui.press('esc', pause=1)
-            gui.press('esc', pause=1)
-            gui.press('esc', pause=1)
+            gui.press('space', pause=1)
+            gui.press('space', pause=1)
+            gui.press('space', pause=1)
+            gui.press('space', pause=1)
+            gui.press('space', pause=1)
         return server.get_observation()[0]
 
     def execute(self, action):
