@@ -1,7 +1,5 @@
 Reward = {}
 
-local DISCOUNT_FACTOR = 0.999
-
 local bot = GetBot()
 
 local enemy_tower = GetTower(TEAM_DIRE, TOWER_MID_1);
@@ -110,17 +108,12 @@ function is_near_enemy_tower()
     end
 end
 
-function get_state_potential()
-    local dst = max(1, GetUnitToUnitDistance(bot, enemy_tower))
-    return 1/dst
-end
-
 local was_near_enemy_tower = 0
-local old_potential = get_state_potential()
 
 function Reward.get_reward(wrong_action)
 --    local my_health = get_my_health()
 --    local my_kills = get_my_kills()
+--    local my_deaths = get_my_deaths()
 --    local enemy_health = get_enemy_health()
 --    local enemy_tower_health = get_enemy_tower_health()
 --    local ally_tower_health = get_ally_tower_health()
@@ -137,20 +130,17 @@ function Reward.get_reward(wrong_action)
 --            - wrong_action * 30
 
 
-    local new_potential = get_state_potential()
-    local reward = DISCOUNT_FACTOR * new_potential - old_potential
-    old_potential = new_potential
+    local reward = 0
 
-    local my_deaths = get_my_deaths()
     if (is_near_enemy_tower() - was_near_enemy_tower == 1) then
         reward = reward + 100000
         was_near_enemy_tower = 1
     end
-    last_deaths = my_deaths
 
 --    last_enemy_tower_health = enemy_tower_health
 --    last_ally_tower_health = ally_tower_health
 --    last_kills = my_kills
+--    last_deaths = my_deaths
 --    last_hits = hits
 --    last_my_health = my_health
 --    last_enemy_health = enemy_health

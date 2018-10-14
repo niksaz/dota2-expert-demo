@@ -1,22 +1,20 @@
 # Author: Mikita Sazanovich
 
-import tensorflow as tf
-import numpy as np
-import os
-import sys
 import itertools
+import os
 import random
-import pickle
+import sys
 from collections import namedtuple, deque
+
+import numpy as np
+import tensorflow as tf
 
 sys.path.append('../')
 
 from dotaenv import DotaEnvironment
 
-state_space = 3
-action_space = 16
-
-Transition = namedtuple("Transition", ["state", "action", "reward", "next_state", "done"])
+STATE_SPACE = 3
+ACTION_SPACE = 16
 
 
 class Estimator:
@@ -39,7 +37,7 @@ class Estimator:
 
     def _build_model(self):
         # Input
-        self.X = tf.placeholder(shape=[None, state_space], dtype=tf.float32, name="X")
+        self.X = tf.placeholder(shape=[None, STATE_SPACE], dtype=tf.float32, name="X")
         # The TD value
         self.Y = tf.placeholder(shape=[None], dtype=tf.float32, name="Y")
         # Selected action index
@@ -55,7 +53,7 @@ class Estimator:
                               activation=tf.nn.relu)
         # fc1_print = tf.Print(fc1, [fc1], message="fc1", summarize=layer_shape)
 
-        fc2 = tf.layers.dense(inputs=fc1, units=action_space, activation=None)
+        fc2 = tf.layers.dense(inputs=fc1, units=ACTION_SPACE, activation=None)
         # fc2_print = tf.Print(fc2, [fc2], message="fc2", summarize=action_space)
 
         self.predictions = fc2
@@ -70,7 +68,8 @@ class Estimator:
 
         # Optimizer
         self.optimizer = tf.train.RMSPropOptimizer(0.00025, 0.99, 0.0, 1e-6)
-        self.train_op = self.optimizer.minimize(self.loss, global_step=tf.contrib.framework.get_global_step())
+        self.train_op = self.optimizer.minimize(self.loss,
+                                                global_step=tf.train.get_global_step())
 
         # Summaries for Tensorboard
         self.summaries = tf.summary.merge([
@@ -87,11 +86,15 @@ class Estimator:
     def update(self, sess, X, actions, targets):
         feed_dict = {self.X: X, self.Y: targets, self.action_ind: actions}
         summaries, global_step, _, loss = sess.run(
-            [self.summaries, tf.contrib.framework.get_global_step(), self.train_op, self.loss],
+            [self.summaries, tf.train.get_global_step(), self.train_op, self.loss],
             feed_dict)
         if self.summary_writer:
             self.summary_writer.add_summary(summaries, global_step)
         return loss
+
+
+GOAL = np.array([-1543.998535, -1407.998291])
+Transition = namedtuple("Transition", ["state", "action", "reward", "next_state", "done"])
 
 
 class ReplayBuffer:
@@ -101,13 +104,28 @@ class ReplayBuffer:
         self.replay_memory = deque(maxlen=replay_memory_size)
 
     def push(self, transition):
-        # Ignore incorrect transitions
-        if len(transition.state) == 0 or len(transition.next_state) == 0:
+        if transition is None:
             return
         self.replay_memory.append(transition)
 
     def sample(self, batch_size):
         return random.sample(self.replay_memory, batch_size)
+
+
+class TransitionBuilder:
+
+    def __init__(self, discount_factor):
+        self.discount_factor = discount_factor
+
+    def build(self, state, action, reward, next_state, done):
+        # Discard invalid transitions
+        if len(state) == 0 or len(next_state) == 0:
+            return None
+        # Potential-based reward shaping
+        potential = np.linalg.norm(np.array(state[:2]) - GOAL)
+        next_potential = np.linalg.norm(np.array(next_state[:2]) - GOAL)
+        reward += self.discount_factor * next_potential - potential
+        return Transition(state, action, reward, next_state, done)
 
 
 def copy_model_parameters(sess, estimator1, estimator2):
@@ -131,7 +149,7 @@ def copy_model_parameters(sess, estimator1, estimator2):
     sess.run(update_ops)
 
 
-def make_epsilon_greedy_policy(estimator, nA=action_space):
+def make_epsilon_greedy_policy(estimator, nA=ACTION_SPACE):
     """
     Creates an epsilon-greedy policy based on a given Q-function approximator and epsilon.
     Args:
@@ -162,10 +180,16 @@ def deep_q_learning(sess,
                     discount_factor=0.999,
                     epsilon_start=1.0,
                     epsilon_end=0.1,
-                    epsilon_decay_steps=100000,
+                    epsilon_decay_steps=10000,
                     batch_size=32,
                     restore=True):
 
+    reward_dir = os.path.join(experiment_dir, "rewards")
+    if not os.path.exists(reward_dir):
+        os.makedirs(reward_dir)
+    reward_writer = tf.summary.FileWriter(reward_dir)
+
+    transition_builder = TransitionBuilder(discount_factor=discount_factor)
     replay_buffer = ReplayBuffer(replay_memory_size)
 
     # Create directories for checkpoints and summaries
@@ -173,7 +197,6 @@ def deep_q_learning(sess,
     if not os.path.exists(checkpoint_dir):
         os.makedirs(checkpoint_dir)
     checkpoint_path = os.path.join(checkpoint_dir, "model")
-    saved_rewards_file = os.path.join(experiment_dir, "saved_rewards.pkl")
 
     saver = tf.train.Saver()
     if restore:
@@ -183,19 +206,13 @@ def deep_q_learning(sess,
             print("Loading model checkpoint {}...\n".format(latest_checkpoint))
             saver.restore(sess, latest_checkpoint)
 
-        print("Loading saved rewards...\n")
-        with open(saved_rewards_file, "rb") as input_file:
-            episode_rewards = pickle.load(input_file)
-    else:
-        episode_rewards = []
-
-    total_t = sess.run(tf.contrib.framework.get_global_step())
+    total_t = sess.run(tf.train.get_global_step())
 
     # The epsilon decay schedule
     epsilons = np.linspace(epsilon_start, epsilon_end, epsilon_decay_steps)
 
     # The policy we're following
-    policy = make_epsilon_greedy_policy(q_estimator, action_space)
+    policy = make_epsilon_greedy_policy(q_estimator, ACTION_SPACE)
 
     # Populate the replay memory with initial experience
     print("Populating replay memory...")
@@ -204,7 +221,8 @@ def deep_q_learning(sess,
         action_probs = policy(sess, state, epsilons[min(total_t, epsilon_decay_steps-1)])
         action = np.random.choice(np.arange(len(action_probs)), p=action_probs)
         next_state, reward, done = env.execute(action=action)
-        replay_buffer.push(Transition(state, action, reward, next_state, done))
+        replay_buffer.push(
+            transition_builder.build(state, action, reward, next_state, done))
         if done:
             state = env.reset()
         else:
@@ -248,24 +266,15 @@ def deep_q_learning(sess,
             multiplier *= discount_factor
 
             # Save transition to replay memory
-            replay_buffer.push(Transition(state, action, reward, next_state, done))
+            replay_buffer.push(
+                transition_builder.build(state, action, reward, next_state, done))
 
             # Sample a minibatch from the replay memory
             samples = replay_buffer.sample(batch_size)
             states_batch, action_batch, reward_batch, next_states_batch, done_batch = map(np.array, zip(*samples))
 
             # Calculate q values and targets (Double DQN)
-            try:
-                q_values_next = q_estimator.predict(sess, next_states_batch)
-            except:
-                print("CAUGHT!!!!")
-                print(samples)
-                print(states_batch)
-                print(action_batch)
-                print(reward_batch)
-                print(next_states_batch)
-                print(done_batch)
-                exit(1)
+            q_values_next = q_estimator.predict(sess, next_states_batch)
 
             best_actions = np.argmax(q_values_next, axis=1)
             q_values_next_target = target_estimator.predict(sess, next_states_batch)
@@ -276,15 +285,15 @@ def deep_q_learning(sess,
             states_batch = np.array(states_batch)
             loss = q_estimator.update(sess, states_batch, action_batch, targets_batch)
 
-            if done:
-                print("Finished episode with reward", episode_reward)
-                episode_rewards.append(episode_reward)
-                with open(saved_rewards_file, "wb") as output_file:
-                    pickle.dump(obj=episode_rewards, file=output_file)
-                break
-
             state = next_state
             total_t += 1
+
+            if done:
+                print("Finished episode with reward", episode_reward)
+                reward_writer.add_summary(
+                    tf.Summary(value=[tf.Summary.Value(tag="rewards", simple_value=episode_reward)]),
+                    total_t)
+                break
 
 
 def main():
@@ -311,7 +320,8 @@ def main():
             q_estimator=q_estimator,
             target_estimator=target_estimator,
             experiment_dir=experiment_dir,
-            num_episodes=200)
+            num_episodes=200,
+            restore=False)
 
 
 if __name__ == "__main__":
