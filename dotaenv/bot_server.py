@@ -52,7 +52,7 @@ def step(action):
     current_action = action_to_json(action)
     lock.release()
 
-    observation_received.wait(timeout=30)
+    observation_received.wait(timeout=60)
     result = observation
     observation = None
     observation_received.clear()
@@ -72,7 +72,7 @@ def get_observation():
     current_fsm_state = FsmState.SEND_OBSERVATION
     lock.release()
 
-    observation_received.wait()
+    observation_received.wait(timeout=60)
     result = observation
     observation = None
     observation_received.clear()

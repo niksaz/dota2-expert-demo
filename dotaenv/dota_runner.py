@@ -28,6 +28,19 @@ def restart_game():
     gui.press('\\', pause=0.1)
 
 
+def close_game():
+    # bring up the menu
+    gui.click(x=373, y=223, pause=0.5)
+    # disconnect
+    gui.click(x=980, y=671, pause=0.5)
+    # confirm it
+    gui.click(x=680, y=488, pause=2)
+    # exit
+    gui.click(x=1068, y=228, pause=0.5)
+    # confirm it
+    gui.click(x=680, y=475, pause=5)
+
+
 def start_game():
     # start
     gui.click(x=974, y=668, pause=0.5)

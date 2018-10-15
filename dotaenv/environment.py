@@ -7,7 +7,7 @@ from tensorforce.environments import Environment
 
 import dotaenv.bot_server as server
 from dotaenv.dota_runner import start_game, set_timescale, launch_dota, \
-    restart_game
+    restart_game, close_game
 
 
 class DotaEnvironment(Environment):
@@ -16,23 +16,34 @@ class DotaEnvironment(Environment):
         self.action_space = (16,)
         self.observation_space = (83,)
         self.terminal = False
+        self.restarts = 0
         server.run_app()
         # If the app is running there is no need to launch it again
-        if DotaEnvironment.find_process("dota").find(b"dota 2 beta") == -1:
+        if not DotaEnvironment.is_dota_launched():
             launch_dota()
         set_timescale()
         start_game()
 
     def reset(self):
         if self.terminal:
-            restart_game()
             self.terminal = False
-            time.sleep(10)
-            gui.press('space', pause=1)
-            gui.press('space', pause=1)
-            gui.press('space', pause=1)
-            gui.press('space', pause=1)
-            gui.press('space', pause=1)
+            if self.restarts > 10:
+                self.restarts = 0
+                close_game()
+                while DotaEnvironment.is_dota_launched():
+                    time.sleep(1)
+                launch_dota()
+                set_timescale()
+                start_game()
+            else:
+                self.restarts += 1
+                restart_game()
+                time.sleep(10)
+                gui.press('esc', pause=1)
+                gui.press('esc', pause=1)
+                gui.press('esc', pause=1)
+                gui.press('esc', pause=1)
+                gui.press('esc', pause=1)
         return server.get_observation()[0]
 
     def execute(self, action):
@@ -56,3 +67,7 @@ class DotaEnvironment(Environment):
         ps.stdout.close()
         ps.wait()
         return output
+
+    @staticmethod
+    def is_dota_launched():
+        return DotaEnvironment.find_process("dota").find(b"dota 2 beta") != -1
