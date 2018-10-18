@@ -38,7 +38,7 @@ def close_game():
     # exit
     gui.click(x=1068, y=228, pause=0.5)
     # confirm it
-    gui.click(x=680, y=475, pause=5)
+    gui.click(x=680, y=475, pause=10)
 
 
 def start_game():
