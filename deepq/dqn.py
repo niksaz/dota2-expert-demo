@@ -10,101 +10,13 @@ from collections import namedtuple, deque
 import numpy as np
 import tensorflow as tf
 
-from replay_processor import ReplayProcessor
-
 sys.path.append('../')
 
+from deepq import ReplayRewardShaper, Estimator, StatePreprocessor
 from dotaenv import DotaEnvironment
 
 STATE_SPACE = 3
 ACTION_SPACE = 16
-
-
-class Estimator:
-    """Q-Value estimation neural network.
-
-    Used for both Q-Value estimation and the target network.
-    """
-
-    def __init__(self, scope="estimator", summaries_dir=None):
-        self.scope = scope
-        self.summary_writer = None
-        with tf.variable_scope(scope):
-            # Build the graph
-            self._build_model()
-            if summaries_dir:
-                summary_dir = os.path.join(summaries_dir, "summaries_{}".format(scope))
-                if not os.path.exists(summary_dir):
-                    os.makedirs(summary_dir)
-                self.summary_writer = tf.summary.FileWriter(summary_dir)
-
-    def _build_model(self):
-        # Input
-        self.X = tf.placeholder(shape=[None, STATE_SPACE], dtype=tf.float32, name="X")
-        # The TD value
-        self.Y = tf.placeholder(shape=[None], dtype=tf.float32, name="Y")
-        # Selected action index
-        self.action_ind = tf.placeholder(shape=[None], dtype=tf.int32, name="actions")
-
-        layer_shape = 16
-
-        # Network
-        fc1 = tf.layers.dense(inputs=self.X, units=layer_shape, activation=tf.nn.relu)
-        # fc2 = tf.layers.dense(inputs=fc1, units=ACTION_SPACE, activation=tf.nn.relu)
-        fc3 = tf.layers.dense(inputs=fc1, units=ACTION_SPACE, activation=None)
-
-        self.predictions = fc3
-
-        # Get the predictions for the chosen actions only
-        batch_size = tf.shape(self.X)[0]
-        gather_indices = tf.range(batch_size) * tf.shape(self.predictions)[1] + self.action_ind
-        self.action_predictions = tf.gather(tf.reshape(self.predictions, [-1]), gather_indices)
-
-        # Calculate the loss
-        self.losses = tf.squared_difference(self.Y, self.action_predictions)
-        self.loss = tf.reduce_mean(self.losses)
-
-        # Optimizer
-        self.optimizer = tf.train.RMSPropOptimizer(0.001, 0.99, 0.0, 1e-6)
-        self.train_op = self.optimizer.minimize(self.loss,
-                                                global_step=tf.train.get_global_step())
-
-        # Summaries for Tensorboard
-        self.summaries = tf.summary.merge([
-            tf.summary.scalar("loss", self.loss),
-            tf.summary.histogram("loss_hist", self.losses),
-            tf.summary.histogram("q_values_hist", self.predictions),
-            tf.summary.scalar("max_q_value", tf.reduce_max(self.predictions))
-        ])
-
-    def predict(self, sess, X):
-        feed_dict = {self.X: X}
-        return sess.run(self.predictions, feed_dict=feed_dict)
-
-    def update(self, sess, X, actions, targets):
-        feed_dict = {self.X: X, self.Y: targets, self.action_ind: actions}
-        summaries, global_step, _, loss = sess.run(
-            [self.summaries, tf.train.get_global_step(), self.train_op, self.loss],
-            feed_dict)
-        if self.summary_writer:
-            self.summary_writer.add_summary(summaries, global_step)
-        return loss
-
-
-class StatePreprocessor:
-
-    @staticmethod
-    def process(state):
-        if len(state) > 0:
-            # Normalize x position from [-10000; 10000] to [-1, 1]
-            state[0] = (state[0] - (-10000)) / 20000
-        if len(state) > 1:
-            # Normalize y position from [-10000; 10000] to [-1, 1]
-            state[1] = (state[1] - (-10000)) / 20000
-        if len(state) > 2:
-            # Normalize facing from [0; 360] to [-1, 1]
-            state[2] = state[2] / 360
-        return state
 
 
 GOAL = StatePreprocessor.process(np.array([-1543.998535, -1407.998291]))
@@ -127,11 +39,13 @@ class ReplayBuffer:
         return random.sample(self.replay_memory, batch_size)
 
     def save_buffer(self):
+        return
         print('saving to', self.dump_path)
         with open(self.dump_path, 'wb') as dump_file:
             pickle.dump(self.replay_memory, dump_file)
 
     def load_buffer(self):
+        return
         if os.path.exists(self.dump_path):
             print('loading from', self.dump_path)
             with open(self.dump_path, 'rb') as dump_file:
@@ -177,7 +91,7 @@ def copy_model_parameters(sess, estimator1, estimator2):
     sess.run(update_ops)
 
 
-def make_epsilon_greedy_policy(estimator, nA=ACTION_SPACE):
+def make_epsilon_greedy_policy(estimator, replay_processor, nA=ACTION_SPACE):
     """
     Creates an epsilon-greedy policy based on a given Q-function approximator and epsilon.
     Args:
@@ -190,8 +104,12 @@ def make_epsilon_greedy_policy(estimator, nA=ACTION_SPACE):
     def policy_fn(sess, observation, epsilon):
         A = np.ones(nA, dtype=float) * epsilon / nA
         q_values = estimator.predict(sess, np.expand_dims(observation, 0))[0]
+        for action in range(nA):
+            q_values[action] += replay_processor.get_potential(observation, action)
         best_action = np.argmax(q_values)
         A[best_action] += (1.0 - epsilon)
+        print('state', observation)
+        print('policy', A)
         return A
     return policy_fn
 
@@ -203,7 +121,6 @@ def deep_q_learning(sess,
                     num_episodes,
                     experiment_dir,
                     replay_memory_size=5000,
-                    replay_memory_init_size=500,
                     update_target_estimator_every=500,
                     discount_factor=0.999,
                     epsilon_start=0.1,
@@ -236,53 +153,40 @@ def deep_q_learning(sess,
     # The epsilon decay schedule
     epsilons = np.linspace(epsilon_start, epsilon_end, epsilon_decay_steps)
 
-    # The policy we're following
-    policy = make_epsilon_greedy_policy(q_estimator, ACTION_SPACE)
-
     replay_buffer = ReplayBuffer(replay_memory_size, save_dir=experiment_dir)
     if restore:
         print("Loading replay memory...")
         replay_buffer.load_buffer()
 
-    replay_processor = ReplayProcessor('../replays/', StatePreprocessor)
-    replay_processor.load()
-    # Init Q-function for demo states
-    for i in range(100):
-        for demo in replay_processor.demos:
-            demo_states = []
-            demo_actions = []
-            targets = []
-            for demo_state, demo_action, _ in demo:
-                demo_states.append(demo_state)
-                demo_actions.append(demo_action)
-                targets.append(replay_processor.get_potential(demo_state, demo_action))
-            q_estimator.update(sess, demo_states, demo_actions, targets)
+    reward_shaper = ReplayRewardShaper('../replays/')
+    reward_shaper.load()
+
+    # The policy we're following
+    policy = make_epsilon_greedy_policy(q_estimator, reward_shaper, ACTION_SPACE)
 
     transition_builder = TransitionBuilder(
         discount_factor=discount_factor,
-        replay_processor=replay_processor,
+        replay_processor=reward_shaper,
         action_oracle=lambda state: np.argmax(policy(sess, state, 0.0)))
 
+    # Populate the replay memory with initial experience
     print("Populating replay memory...")
-    while len(replay_buffer.replay_memory) < replay_memory_init_size:
-        # Populate the replay memory with initial experience
-        state = env.reset()
-        state = StatePreprocessor.process(state)
-        for i in range(replay_memory_init_size):
-            action_probs = policy(sess, state, epsilons[min(total_t, epsilon_decay_steps-1)])
-            action = np.random.choice(np.arange(len(action_probs)), p=action_probs)
-            next_state, reward, done = env.execute(action=action)
-            next_state = StatePreprocessor.process(next_state)
-            replay_buffer.push(
-                transition_builder.build(state, action, reward, next_state, done))
-            if done:
-                state = env.reset()
-                state = StatePreprocessor.process(state)
-            else:
-                state = next_state
-            print("Step {step} state: {state}, action: {action}.".format(
-                         step=i, state=state, action=action))
+    state = env.reset()
+    state = StatePreprocessor.process(state)
+    done = False
+    for t in itertools.count():
+        if done:
+            break
+        action_probs = policy(sess, state, epsilons[min(total_t, epsilon_decay_steps-1)])
+        action = np.random.choice(np.arange(len(action_probs)), p=action_probs)
+        print("Step {step} state: {state}, action: {action}.".format(step=t, state=state, action=action))
+        next_state, reward, done = env.execute(action=action)
+        next_state = StatePreprocessor.process(next_state)
+        replay_buffer.push(
+            transition_builder.build(state, action, reward, next_state, done))
+        state = next_state
 
+    # Training the agent
     for i_episode in range(num_episodes):
 
         episode_reward = 0
@@ -355,14 +259,24 @@ def main():
     tf.reset_default_graph()
 
     # Where we save our checkpoints and graphs
-    experiment_dir = os.path.abspath("./experiments/run1")
+    experiment_dir = os.path.abspath("./experiments/biased-greedy2")
 
     # Create a global step variable
     global_step = tf.Variable(0, name="global_step", trainable=False)
 
     # Create estimators
-    q_estimator = Estimator(scope="q", summaries_dir=experiment_dir)
-    target_estimator = Estimator(scope="target_q")
+    learning_rate = 5e-4
+    q_estimator = Estimator(
+        STATE_SPACE,
+        ACTION_SPACE,
+        learning_rate=learning_rate,
+        scope="q",
+        summaries_dir=experiment_dir)
+    target_estimator = Estimator(
+        STATE_SPACE,
+        ACTION_SPACE,
+        learning_rate=learning_rate,
+        scope="target_q")
 
     with tf.Session() as sess:
         sess.run(tf.global_variables_initializer())
@@ -374,10 +288,11 @@ def main():
             target_estimator=target_estimator,
             experiment_dir=experiment_dir,
             num_episodes=1000,
+            replay_memory_size=50000,
             epsilon_start=1.0,
             epsilon_end=0.1,
-            epsilon_decay_steps=10000,
-            restore=True)
+            epsilon_decay_steps=100000,
+            restore=False)
 
 
 if __name__ == "__main__":

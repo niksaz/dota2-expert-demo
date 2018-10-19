@@ -5,16 +5,23 @@ import pickle
 import numpy as np
 import math
 
+from deepq import StatePreprocessor
+
 SIGMA = 0.2 * np.array([[1, 0, 0],
                         [0, 1, 0],
                         [0, 0, 1]])
 
 
-class ReplayProcessor:
+class ReplayRewardShaper:
+    """ Provides potential-based reward shaping based on expert demonstrations.
 
-    def __init__(self, replay_dir, state_preprocessor):
+    Uses replays to parse demonstrated state-action pairs and provides rewards
+    based on them.
+    """
+
+    def __init__(self, replay_dir):
         self.replay_dir = replay_dir
-        self.state_preprocessor = state_preprocessor
+        self.state_preprocessor = StatePreprocessor()
         self.demos = []
 
     def load(self):
@@ -48,7 +55,6 @@ class ReplayProcessor:
         return demo
 
     def get_potential(self, state, action):
-        print('get potential for', state, action)
         # Implemented from: https://www.ijcai.org/Proceedings/15/Papers/472.pdf
         best_value = 0
         for demo in self.demos:
@@ -59,12 +65,11 @@ class ReplayProcessor:
                 value = math.e ** (-1/2*diff.dot(SIGMA).dot(diff))
                 if value > best_value:
                     best_value = value
-        print('best value is', best_value)
         return best_value
 
 
 def main():
-    replay_processor = ReplayProcessor('../replays')
+    replay_processor = ReplayRewardShaper('../replays')
     replay_processor.load()
     print(
         replay_processor.get_potential(np.array([-6700, -6700, 0]), 2))
