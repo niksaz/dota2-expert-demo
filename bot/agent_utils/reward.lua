@@ -101,7 +101,7 @@ function recently_damaged_enemy()
 end
 
 function is_near_enemy_tower()
-    if GetUnitToUnitDistance(bot, enemy_tower) < 500 then
+    if GetUnitToUnitDistance(bot, enemy_tower) < 1000 then
         return 1
     else
         return 0

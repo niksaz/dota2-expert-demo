@@ -32,6 +32,7 @@ class DotaEnvironment(Environment):
                 close_game()
                 while DotaEnvironment.is_dota_launched():
                     time.sleep(1)
+                time.sleep(5)
                 launch_dota()
                 set_timescale()
                 start_game()
