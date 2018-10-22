@@ -58,8 +58,7 @@ class Estimator:
             learning_rate=0.00025,
             momentum=0.95,
             decay=0.0,
-            epsilon=0.01,
-        )
+            epsilon=0.01,)
         self.train_op = self.optimizer.minimize(self.loss,
                                                 global_step=tf.train.get_global_step())
 
@@ -68,8 +67,7 @@ class Estimator:
             tf.summary.scalar("loss", self.loss),
             tf.summary.histogram("loss_hist", self.losses),
             tf.summary.histogram("q_values_hist", self.predictions),
-            tf.summary.scalar("max_q_value", tf.reduce_max(self.predictions))
-        ])
+            tf.summary.scalar("max_q_value", tf.reduce_max(self.predictions))])
 
     def predict(self, sess, X):
         feed_dict = {self.X: X}

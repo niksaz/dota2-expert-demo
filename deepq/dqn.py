@@ -2,10 +2,10 @@
 
 import itertools
 import os
-import random
 import pickle
 import sys
-from collections import namedtuple, deque
+from collections import deque
+from namedlist import namedlist
 
 import numpy as np
 import tensorflow as tf
@@ -17,25 +17,50 @@ from dotaenv import DotaEnvironment
 
 STATE_SPACE = 3
 ACTION_SPACE = 16
+MAX_PRIORITY = 1
+EPS_PRIORITY = 1e-9
+
+Transition = namedlist(
+    'Transition',
+    ['state', 'action', 'next_state', 'done', 'reward', 'priority'])
 
 
-Transition = namedtuple("Transition", ["state", "action", "reward", "next_state", "done"])
+class PrioritizedReplayBuffer:
+    """Reference paper: https://arxiv.org/pdf/1511.05952.pdf.
+    """
 
-
-class ReplayBuffer:
-
-    def __init__(self, replay_memory_size, save_dir):
-        # The replay memory
+    def __init__(self, replay_memory_size, alpha, beta0, save_dir):
+        """Initializes the replay buffer and caps the memory size to replay_memory_size.
+        """
         self.replay_memory = deque(maxlen=replay_memory_size)
+        self.alpha = alpha
+        self.beta0 = beta0
         self.dump_path = os.path.join(save_dir, 'replay_buffer.pickle')
 
-    def push(self, transition):
-        if transition is None:
-            return
+    def push(self, state, action, next_state, done, reward):
+        """ Pushes the transition into memory with MAX_PRIORITY.
+
+        If the starting or resulting states are incorrect the transition is
+        omitted.
+        """
+        if len(state) != STATE_SPACE or len(next_state) != STATE_SPACE:
+            return None
+        transition = Transition(state, action, next_state, done, reward, MAX_PRIORITY)
         self.replay_memory.append(transition)
 
     def sample(self, batch_size):
-        return random.sample(self.replay_memory, batch_size)
+        """Samples the batch according to priorities.
+
+        Returns a tuple of (transitions, indices).
+        """
+        buffer_size = len(self.replay_memory)
+        p = np.zeros(buffer_size)
+        for i in range(buffer_size):
+            p[i] = self.replay_memory[i].priority ** self.alpha
+        p /= p.sum()
+        idx = np.random.choice(buffer_size, batch_size, p=p).tolist()
+        samples = [self.replay_memory[id] for id in idx]
+        return samples, idx
 
     def save_buffer(self):
         print('saving to', self.dump_path)
@@ -47,24 +72,6 @@ class ReplayBuffer:
             print('loading from', self.dump_path)
             with open(self.dump_path, 'rb') as dump_file:
                 self.replay_memory = pickle.load(dump_file)
-
-
-class TransitionBuilder:
-
-    def __init__(self, discount_factor, replay_processor, action_oracle):
-        self.discount_factor = discount_factor
-        self.replay_processor = replay_processor
-        self.action_oracle = action_oracle
-
-    def build(self, state, action, reward, next_state, done):
-        # Discard invalid transitions
-        if len(state) != STATE_SPACE or len(next_state) != STATE_SPACE:
-            return None
-        potential = self.replay_processor.get_potential(state, action)
-        next_action = self.action_oracle(next_state)
-        next_potential = self.replay_processor.get_potential(next_state, next_action)
-        reward += self.discount_factor * next_potential - potential
-        return Transition(state, action, reward, next_state, done)
 
 
 def copy_model_parameters(sess, estimator1, estimator2):
@@ -88,28 +95,29 @@ def copy_model_parameters(sess, estimator1, estimator2):
     sess.run(update_ops)
 
 
-def make_epsilon_greedy_policy(estimator, replay_processor, nA=ACTION_SPACE):
+def make_epsilon_greedy_policy(estimator, reward_shaper, acts):
     """
     Creates an epsilon-greedy policy based on a given Q-function approximator and epsilon.
     Args:
         estimator: An estimator that returns q values for a given state
-        nA: Number of actions in the environment.
+        reward_shaper: Reward shaper for a (state, action) pair.
+        acts: Number of actions in the environment.
     Returns:
         A function that takes the (sess, observation, epsilon) as an argument and returns
         the probabilities for each action in the form of a numpy array of length nA.
     """
     def policy_fn(sess, observation, epsilon):
-        A = np.ones(nA, dtype=float) * epsilon / nA
+        A = np.ones(acts, dtype=float) * epsilon / acts
         q_values = estimator.predict(sess, np.expand_dims(observation, 0))[0]
-        for action in range(nA):
-            q_values[action] += replay_processor.get_potential(observation, action)
+        for action in range(acts):
+            q_values[action] += reward_shaper.get_potential(observation, action)
         best_action = np.argmax(q_values)
         A[best_action] += (1.0 - epsilon)
         return A
     return policy_fn
 
 
-def populate_replay_buffer(replay_buffer, transition_builder, action_sampler, env):
+def populate_replay_buffer(replay_buffer, action_sampler, env):
     print("Populating replay memory...")
     state = env.reset()
     state = StatePreprocessor.process(state)
@@ -122,7 +130,7 @@ def populate_replay_buffer(replay_buffer, transition_builder, action_sampler, en
         print("Step {step} state: {state}, action: {action}.".format(step=t, state=state, action=action))
         next_state, reward, done = env.execute(action=action)
         next_state = StatePreprocessor.process(next_state)
-        replay_buffer.push(transition_builder.build(state, action, reward, next_state, done))
+        replay_buffer.push(state, action, next_state, done, reward)
         state = next_state
 
 
@@ -165,7 +173,11 @@ def deep_q_learning(sess,
     # The epsilon decay schedule
     epsilons = np.linspace(epsilon_start, epsilon_end, epsilon_decay_steps)
 
-    replay_buffer = ReplayBuffer(replay_memory_size, save_dir=experiment_dir)
+    replay_buffer = PrioritizedReplayBuffer(
+        replay_memory_size,
+        alpha=0.6,
+        beta0=0.4,
+        save_dir=experiment_dir)
 
     reward_shaper = ReplayRewardShaper('../replays/')
     reward_shaper.load()
@@ -173,19 +185,13 @@ def deep_q_learning(sess,
     # The policy we're following
     policy = make_epsilon_greedy_policy(q_estimator, reward_shaper, ACTION_SPACE)
 
-    transition_builder = TransitionBuilder(
-        discount_factor=discount_factor,
-        replay_processor=reward_shaper,
-        action_oracle=lambda state: np.argmax(policy(sess, state, 0.0)))
-
     # Populate the replay memory with initial experience
     action_sampler = lambda state: policy(
         sess, state, epsilons[min(total_t, epsilon_decay_steps-1)])
-    populate_replay_buffer(replay_buffer, transition_builder, action_sampler, env)
+    populate_replay_buffer(replay_buffer, action_sampler, env)
 
     # Training the agent
     for i_episode in itertools.count():
-
         episode_reward = 0
         multiplier = 1
 
@@ -227,27 +233,29 @@ def deep_q_learning(sess,
             multiplier *= discount_factor
 
             # Save transition to replay memory
-            replay_buffer.push(
-                transition_builder.build(state, action, reward, next_state, done))
+            replay_buffer.push(state, action, next_state, done, reward)
 
             # Sample a minibatch from the replay memory
-            samples = replay_buffer.sample(batch_size)
-            states_batch, action_batch, reward_batch, next_states_batch, done_batch = map(np.array, zip(*samples))
+            samples, idx = replay_buffer.sample(batch_size)
+            states, actions, next_states, dones, rewards, _ = map(np.array, zip(*samples))
 
             # Calculate q values and targets (Double DQN)
-            q_values_next = q_estimator.predict(sess, next_states_batch)
+            next_q_values = q_estimator.predict(sess, next_states)
+            next_actions = np.argmax(next_q_values, axis=1)
 
-            best_actions = np.argmax(q_values_next, axis=1)
-            q_values_next_target = target_estimator.predict(sess, next_states_batch)
-            targets_batch = reward_batch + np.invert(done_batch).astype(np.float32) * \
-                discount_factor * q_values_next_target[np.arange(batch_size), best_actions]
+            next_q_values_target = target_estimator.predict(sess, next_states)
+            not_dones = np.invert(dones).astype(np.float32)
+
+            targets_batch = (
+                rewards
+                + discount_factor * reward_shaper.get_potentials(next_states, next_actions)
+                - reward_shaper.get_potentials(states, actions)
+                + discount_factor * not_dones * next_q_values_target[np.arange(batch_size), next_actions])
 
             # Perform gradient descent update
-            states_batch = np.array(states_batch)
-            loss = q_estimator.update(sess, states_batch, action_batch, targets_batch)
+            loss = q_estimator.update(sess, states, actions, targets_batch)
 
-            print("\rStep {} ({}/{}) @ Episode {}, loss: {}".format(
-                    t, total_t, num_steps, i_episode, loss), end="")
+            print("\rStep {} ({}/{}) @ Episode {}, loss: {}".format(t, total_t, num_steps, i_episode, loss), end="")
             sys.stdout.flush()
 
             state = next_state
@@ -257,11 +265,10 @@ def deep_q_learning(sess,
 def main():
     env = DotaEnvironment()
 
-    tf.reset_default_graph()
-
     # Where we save our checkpoints and graphs
-    experiment_dir = os.path.abspath("./experiments/biased-greedy-rms-prop")
+    experiment_dir = os.path.abspath("./experiments/random")
 
+    tf.reset_default_graph()
     # Create a global step variable
     global_step = tf.Variable(0, name="global_step", trainable=False)
 

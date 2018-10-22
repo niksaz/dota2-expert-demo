@@ -17,6 +17,8 @@ class ReplayRewardShaper:
 
     Uses replays to parse demonstrated state-action pairs and provides rewards
     based on them.
+
+    Reference paper: https://www.ijcai.org/Proceedings/15/Papers/472.pdf.
     """
 
     def __init__(self, replay_dir):
@@ -55,7 +57,6 @@ class ReplayRewardShaper:
         return demo
 
     def get_potential(self, state, action):
-        # Implemented from: https://www.ijcai.org/Proceedings/15/Papers/472.pdf
         best_value = 0
         for demo in self.demos:
             for demo_state, demo_action, _ in demo:
@@ -66,6 +67,13 @@ class ReplayRewardShaper:
                 if value > best_value:
                     best_value = value
         return best_value
+
+    def get_potentials(self, states, actions):
+        N = states.shape[0]
+        potentials = np.zeros(N)
+        for i in range(N):
+            potentials[i] = self.get_potential(states[i], actions[i])
+        return potentials
 
 
 def main():
