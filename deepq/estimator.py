@@ -14,21 +14,20 @@ class Estimator:
             self,
             state_space,
             action_space,
-            learning_rate,
             scope="estimator",
             summaries_dir=None):
         self.scope = scope
         self.summary_writer = None
         with tf.variable_scope(scope):
             # Build the graph
-            self._build_model(state_space, action_space, learning_rate)
+            self._build_model(state_space, action_space)
             if summaries_dir:
                 summary_dir = os.path.join(summaries_dir, "summaries_{}".format(scope))
                 if not os.path.exists(summary_dir):
                     os.makedirs(summary_dir)
                 self.summary_writer = tf.summary.FileWriter(summary_dir)
 
-    def _build_model(self, state_space, action_space, learning_rate):
+    def _build_model(self, state_space, action_space):
         # Input
         self.X = tf.placeholder(shape=[None, state_space], dtype=tf.float32, name="X")
         # The TD value
@@ -54,8 +53,13 @@ class Estimator:
         self.losses = tf.squared_difference(self.Y, self.action_predictions)
         self.loss = tf.reduce_mean(self.losses)
 
-        # Optimizer
-        self.optimizer = tf.train.AdamOptimizer(learning_rate)
+        # Optimizer parameters are taken from DQN paper (V. Mnih 2015)
+        self.optimizer = tf.train.RMSPropOptimizer(
+            learning_rate=0.00025,
+            momentum=0.95,
+            decay=0.0,
+            epsilon=0.01,
+        )
         self.train_op = self.optimizer.minimize(self.loss,
                                                 global_step=tf.train.get_global_step())
 

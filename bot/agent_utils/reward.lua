@@ -133,7 +133,7 @@ function Reward.get_reward(wrong_action)
     local reward = 0
 
     if (is_near_enemy_tower() - was_near_enemy_tower == 1) then
-        reward = reward + 100000
+        reward = reward + 1
         was_near_enemy_tower = 1
     end
 

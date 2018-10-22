@@ -19,7 +19,6 @@ STATE_SPACE = 3
 ACTION_SPACE = 16
 
 
-GOAL = StatePreprocessor.process(np.array([-1543.998535, -1407.998291]))
 Transition = namedtuple("Transition", ["state", "action", "reward", "next_state", "done"])
 
 
@@ -39,13 +38,11 @@ class ReplayBuffer:
         return random.sample(self.replay_memory, batch_size)
 
     def save_buffer(self):
-        return
         print('saving to', self.dump_path)
         with open(self.dump_path, 'wb') as dump_file:
             pickle.dump(self.replay_memory, dump_file)
 
     def load_buffer(self):
-        return
         if os.path.exists(self.dump_path):
             print('loading from', self.dump_path)
             with open(self.dump_path, 'rb') as dump_file:
@@ -108,24 +105,39 @@ def make_epsilon_greedy_policy(estimator, replay_processor, nA=ACTION_SPACE):
             q_values[action] += replay_processor.get_potential(observation, action)
         best_action = np.argmax(q_values)
         A[best_action] += (1.0 - epsilon)
-        print('state', observation)
-        print('policy', A)
         return A
     return policy_fn
+
+
+def populate_replay_buffer(replay_buffer, transition_builder, action_sampler, env):
+    print("Populating replay memory...")
+    state = env.reset()
+    state = StatePreprocessor.process(state)
+    done = False
+    for t in itertools.count():
+        if done:
+            break
+        action_probs = action_sampler(state)
+        action = np.random.choice(np.arange(len(action_probs)), p=action_probs)
+        print("Step {step} state: {state}, action: {action}.".format(step=t, state=state, action=action))
+        next_state, reward, done = env.execute(action=action)
+        next_state = StatePreprocessor.process(next_state)
+        replay_buffer.push(transition_builder.build(state, action, reward, next_state, done))
+        state = next_state
 
 
 def deep_q_learning(sess,
                     env,
                     q_estimator,
                     target_estimator,
-                    num_episodes,
+                    num_steps,
                     experiment_dir,
                     replay_memory_size=5000,
                     update_target_estimator_every=500,
                     discount_factor=0.999,
-                    epsilon_start=0.1,
+                    epsilon_start=1.0,
                     epsilon_end=0.1,
-                    epsilon_decay_steps=1,
+                    epsilon_decay_steps=10000,
                     batch_size=32,
                     restore=True):
 
@@ -154,9 +166,6 @@ def deep_q_learning(sess,
     epsilons = np.linspace(epsilon_start, epsilon_end, epsilon_decay_steps)
 
     replay_buffer = ReplayBuffer(replay_memory_size, save_dir=experiment_dir)
-    if restore:
-        print("Loading replay memory...")
-        replay_buffer.load_buffer()
 
     reward_shaper = ReplayRewardShaper('../replays/')
     reward_shaper.load()
@@ -170,24 +179,12 @@ def deep_q_learning(sess,
         action_oracle=lambda state: np.argmax(policy(sess, state, 0.0)))
 
     # Populate the replay memory with initial experience
-    print("Populating replay memory...")
-    state = env.reset()
-    state = StatePreprocessor.process(state)
-    done = False
-    for t in itertools.count():
-        if done:
-            break
-        action_probs = policy(sess, state, epsilons[min(total_t, epsilon_decay_steps-1)])
-        action = np.random.choice(np.arange(len(action_probs)), p=action_probs)
-        print("Step {step} state: {state}, action: {action}.".format(step=t, state=state, action=action))
-        next_state, reward, done = env.execute(action=action)
-        next_state = StatePreprocessor.process(next_state)
-        replay_buffer.push(
-            transition_builder.build(state, action, reward, next_state, done))
-        state = next_state
+    action_sampler = lambda state: policy(
+        sess, state, epsilons[min(total_t, epsilon_decay_steps-1)])
+    populate_replay_buffer(replay_buffer, transition_builder, action_sampler, env)
 
     # Training the agent
-    for i_episode in range(num_episodes):
+    for i_episode in itertools.count():
 
         episode_reward = 0
         multiplier = 1
@@ -198,30 +195,30 @@ def deep_q_learning(sess,
         # Reset the environment
         state = env.reset()
         state = StatePreprocessor.process(state)
-        loss = None
         done = False
 
         # One step in the environment
         for t in itertools.count():
+            if total_t >= num_steps:
+                return
+
+            eps = epsilons[min(total_t, epsilon_decay_steps-1)]
+
             if done or len(state) != STATE_SPACE:
                 print("Finished episode with reward", episode_reward)
-                reward_writer.add_summary(
-                    tf.Summary(value=[tf.Summary.Value(tag="rewards", simple_value=episode_reward)]),
-                    total_t)
-                replay_buffer.save_buffer()
+                summary = tf.Summary(value=[tf.Summary.Value(tag="rewards", simple_value=episode_reward)])
+                reward_writer.add_summary(summary, i_episode)
+                summary = tf.Summary(value=[tf.Summary.Value(tag="eps", simple_value=eps)])
+                reward_writer.add_summary(summary, i_episode)
                 break
+
             # Maybe update the target estimator
             if total_t % update_target_estimator_every == 0:
                 copy_model_parameters(sess, q_estimator, target_estimator)
                 print("\nCopied model parameters to target network.")
 
-            # Print out which step we're on, useful for debugging.
-            print("\rStep {} ({}) @ Episode {}/{}, loss: {}".format(
-                    t, total_t, i_episode + 1, num_episodes, loss), end="")
-            sys.stdout.flush()
-
             # Take a step
-            action_probs = policy(sess, state, epsilons[min(total_t, epsilon_decay_steps-1)])
+            action_probs = policy(sess, state, eps)
             action = np.random.choice(np.arange(len(action_probs)), p=action_probs)
             next_state, reward, done = env.execute(action=action)
             next_state = StatePreprocessor.process(next_state)
@@ -249,6 +246,10 @@ def deep_q_learning(sess,
             states_batch = np.array(states_batch)
             loss = q_estimator.update(sess, states_batch, action_batch, targets_batch)
 
+            print("\rStep {} ({}/{}) @ Episode {}, loss: {}".format(
+                    t, total_t, num_steps, i_episode, loss), end="")
+            sys.stdout.flush()
+
             state = next_state
             total_t += 1
 
@@ -259,23 +260,20 @@ def main():
     tf.reset_default_graph()
 
     # Where we save our checkpoints and graphs
-    experiment_dir = os.path.abspath("./experiments/biased-greedy2")
+    experiment_dir = os.path.abspath("./experiments/biased-greedy-rms-prop")
 
     # Create a global step variable
     global_step = tf.Variable(0, name="global_step", trainable=False)
 
     # Create estimators
-    learning_rate = 5e-4
     q_estimator = Estimator(
         STATE_SPACE,
         ACTION_SPACE,
-        learning_rate=learning_rate,
         scope="q",
         summaries_dir=experiment_dir)
     target_estimator = Estimator(
         STATE_SPACE,
         ACTION_SPACE,
-        learning_rate=learning_rate,
         scope="target_q")
 
     with tf.Session() as sess:
@@ -287,11 +285,12 @@ def main():
             q_estimator=q_estimator,
             target_estimator=target_estimator,
             experiment_dir=experiment_dir,
-            num_episodes=1000,
-            replay_memory_size=50000,
+            num_steps=15000,
+            replay_memory_size=5000,
+            update_target_estimator_every=1000,
             epsilon_start=1.0,
             epsilon_end=0.1,
-            epsilon_decay_steps=100000,
+            epsilon_decay_steps=10000,
             restore=False)
 
 
