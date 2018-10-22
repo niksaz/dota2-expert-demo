@@ -103,14 +103,14 @@ def make_epsilon_greedy_policy(estimator, reward_shaper, acts):
         reward_shaper: Reward shaper for a (state, action) pair.
         acts: Number of actions in the environment.
     Returns:
-        A function that takes the (sess, observation, epsilon) as an argument and returns
+        A function that takes the (sess, state, epsilon) as an argument and returns
         the probabilities for each action in the form of a numpy array of length nA.
     """
-    def policy_fn(sess, observation, epsilon):
+    def policy_fn(sess, state, epsilon):
         A = np.ones(acts, dtype=float) * epsilon / acts
-        q_values = estimator.predict(sess, np.expand_dims(observation, 0))[0]
+        q_values = estimator.predict(sess, np.expand_dims(state, 0))[0]
         for action in range(acts):
-            q_values[action] += reward_shaper.get_potential(observation, action)
+            q_values[action] += reward_shaper.get_potential(state, action)
         best_action = np.argmax(q_values)
         A[best_action] += (1.0 - epsilon)
         return A
@@ -241,6 +241,9 @@ def deep_q_learning(sess,
 
             # Calculate q values and targets (Double DQN)
             next_q_values = q_estimator.predict(sess, next_states)
+            for i in range(batch_size):
+                for action in range(ACTION_SPACE):
+                    next_q_values[i][action] += reward_shaper.get_potential(next_states[i], action)
             next_actions = np.argmax(next_q_values, axis=1)
 
             next_q_values_target = target_estimator.predict(sess, next_states)
@@ -253,9 +256,9 @@ def deep_q_learning(sess,
                 + discount_factor * not_dones * next_q_values_target[np.arange(batch_size), next_actions])
 
             # Perform gradient descent update
-            loss = q_estimator.update(sess, states, actions, targets_batch)
+            q_estimator.update(sess, states, actions, targets_batch)
 
-            print("\rStep {} ({}/{}) @ Episode {}, loss: {}".format(t, total_t, num_steps, i_episode, loss), end="")
+            print("\rStep {}, episode {} ({}/{})".format(t, i_episode, total_t, num_steps), end="\t")
             sys.stdout.flush()
 
             state = next_state
