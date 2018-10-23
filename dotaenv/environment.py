@@ -1,13 +1,7 @@
-# /usr/bin/env python3
-import subprocess
-import time
-import pyautogui as gui
-
 from tensorforce.environments import Environment
 
 import dotaenv.bot_server as server
-from dotaenv.dota_runner import start_game, set_timescale, launch_dota, \
-    restart_game, close_game
+import dotaenv.dota_runner as runner
 
 
 class DotaEnvironment(Environment):
@@ -18,33 +12,23 @@ class DotaEnvironment(Environment):
         self.terminal = False
         self.restarts = 0
         server.run_app()
-        # If the app is running there is no need to launch it again
-        if not DotaEnvironment.is_dota_launched():
-            launch_dota()
-        set_timescale()
-        start_game()
+        runner.make_sure_dota_is_launched()
+        runner.set_timescale()
+        runner.start_game()
 
     def reset(self):
+        runner._bring_into_focus()
         if self.terminal:
             self.terminal = False
             if self.restarts > 10:
                 self.restarts = 0
-                close_game()
-                while DotaEnvironment.is_dota_launched():
-                    time.sleep(1)
-                time.sleep(5)
-                launch_dota()
-                set_timescale()
-                start_game()
+                runner.close_game()
+                runner.make_sure_dota_is_launched()
+                runner.set_timescale()
+                runner.start_game()
             else:
                 self.restarts += 1
-                restart_game()
-                time.sleep(10)
-                gui.press('esc', pause=1)
-                gui.press('esc', pause=1)
-                gui.press('esc', pause=1)
-                gui.press('esc', pause=1)
-                gui.press('esc', pause=1)
+                runner.restart_game()
         return server.get_observation()[0]
 
     def execute(self, action):
@@ -60,15 +44,5 @@ class DotaEnvironment(Environment):
     def actions(self):
         return dict(type='int', num_actions=self.action_space[0])
 
-    @staticmethod
-    def find_process(process_name):
-        ps = subprocess.Popen("ps -ef | grep " + process_name,
-                              shell=True, stdout=subprocess.PIPE)
-        output = ps.stdout.read()
-        ps.stdout.close()
-        ps.wait()
-        return output
-
-    @staticmethod
-    def is_dota_launched():
-        return DotaEnvironment.find_process("dota").find(b"dota 2 beta") != -1
+    def __str__(self):
+        return 'Dota 2 Environment'
