@@ -100,15 +100,13 @@ function recently_damaged_enemy()
     return result
 end
 
-function is_near_enemy_tower()
-    if GetUnitToUnitDistance(bot, enemy_tower) < 1000 then
+function is_near_ally_tower()
+    if GetUnitToUnitDistance(bot, ally_tower) < 1000 then
         return 1
     else
         return 0
     end
 end
-
-local was_near_enemy_tower = 0
 
 function Reward.get_reward(wrong_action)
 --    local my_health = get_my_health()
@@ -131,10 +129,8 @@ function Reward.get_reward(wrong_action)
 
 
     local reward = 0
-
-    if (is_near_enemy_tower() - was_near_enemy_tower == 1) then
+    if is_near_ally_tower() == 1 then
         reward = reward + 1
-        was_near_enemy_tower = 1
     end
 
 --    last_enemy_tower_health = enemy_tower_health
