@@ -134,8 +134,8 @@ end
 
 -- Get all observations.
 function Observation.get_observation()
-    local enemy_creeps = get_creeps_info(bot:GetNearbyCreeps(1500, true))
-    local ally_creeps = get_creeps_info(bot:GetNearbyCreeps(1500, false))
+    local enemy_creeps = get_creeps_info(bot:GetNearbyCreeps(NEARBY_RADIUS, true))
+    local ally_creeps = get_creeps_info(bot:GetNearbyCreeps(NEARBY_RADIUS, false))
 
     local observation = {
         ['self_info'] = get_self_info(),

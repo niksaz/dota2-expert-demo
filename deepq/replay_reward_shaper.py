@@ -7,9 +7,10 @@ import math
 
 from deepq import StatePreprocessor
 
-SIGMA = 0.2 * np.array([[1, 0, 0],
-                        [0, 1, 0],
-                        [0, 0, 1]])
+SIGMA = np.array([[0.2, 0, 0],
+                  [0, 0.2, 0],
+                  [0, 0, 0.2]])
+K = 10
 
 
 class ReplayRewardShaper:
@@ -63,7 +64,7 @@ class ReplayRewardShaper:
                 if demo_action != action:
                     continue
                 diff = state - demo_state
-                value = math.e ** (-1/2*diff.dot(SIGMA).dot(diff))
+                value = K * math.e ** (-1/2*diff.dot(SIGMA).dot(diff))
                 if value > best_value:
                     best_value = value
         return best_value

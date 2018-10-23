@@ -75,9 +75,9 @@ class Estimator:
 
     def update(self, sess, X, actions, targets):
         feed_dict = {self.X: X, self.Y: targets, self.action_ind: actions}
-        summaries, global_step, _, loss = sess.run(
-            [self.summaries, tf.train.get_global_step(), self.train_op, self.loss],
+        summaries, global_step, predictions, _ = sess.run(
+            [self.summaries, tf.train.get_global_step(), self.action_predictions, self.train_op],
             feed_dict)
         if self.summary_writer:
             self.summary_writer.add_summary(summaries, global_step)
-        return loss
+        return predictions

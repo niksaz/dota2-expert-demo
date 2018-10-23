@@ -4,6 +4,7 @@ import itertools
 import os
 import pickle
 import sys
+import argparse
 from collections import deque
 from namedlist import namedlist
 
@@ -58,9 +59,13 @@ class PrioritizedReplayBuffer:
         for i in range(buffer_size):
             p[i] = self.replay_memory[i].priority ** self.alpha
         p /= p.sum()
-        idx = np.random.choice(buffer_size, batch_size, p=p).tolist()
+        idx = np.random.choice(buffer_size, batch_size, replace=False, p=p).tolist()
         samples = [self.replay_memory[id] for id in idx]
         return samples, idx
+
+    def update_priorities(self, idx, priorities):
+        for index, priority in zip(idx, priorities):
+            self.replay_memory[index].priority = min(MAX_PRIORITY, priority)
 
     def save_buffer(self):
         print('saving to', self.dump_path)
@@ -146,6 +151,7 @@ def deep_q_learning(sess,
                     epsilon_start=1.0,
                     epsilon_end=0.1,
                     epsilon_decay_steps=10000,
+                    update_q_values_every=4,
                     batch_size=32,
                     restore=True):
 
@@ -179,7 +185,7 @@ def deep_q_learning(sess,
         beta0=0.4,
         save_dir=experiment_dir)
 
-    reward_shaper = ReplayRewardShaper('../replays/')
+    reward_shaper = ReplayRewardShaper('../replays-xyf/')
     reward_shaper.load()
 
     # The policy we're following
@@ -190,6 +196,7 @@ def deep_q_learning(sess,
         sess, state, epsilons[min(total_t, epsilon_decay_steps-1)])
     populate_replay_buffer(replay_buffer, action_sampler, env)
 
+    print('Training is starting...')
     # Training the agent
     for i_episode in itertools.count():
         episode_reward = 0
@@ -235,28 +242,33 @@ def deep_q_learning(sess,
             # Save transition to replay memory
             replay_buffer.push(state, action, next_state, done, reward)
 
-            # Sample a minibatch from the replay memory
-            samples, idx = replay_buffer.sample(batch_size)
-            states, actions, next_states, dones, rewards, _ = map(np.array, zip(*samples))
+            if total_t % update_q_values_every == 0:
+                # Sample a minibatch from the replay memory
+                samples, idx = replay_buffer.sample(batch_size)
+                states, actions, next_states, dones, rewards, _ = map(np.array, zip(*samples))
 
-            # Calculate q values and targets (Double DQN)
-            next_q_values = q_estimator.predict(sess, next_states)
-            for i in range(batch_size):
-                for action in range(ACTION_SPACE):
-                    next_q_values[i][action] += reward_shaper.get_potential(next_states[i], action)
-            next_actions = np.argmax(next_q_values, axis=1)
+                # Calculate q values and targets (Double DQN)
+                next_q_values = q_estimator.predict(sess, next_states)
+                for i in range(batch_size):
+                    for action in range(ACTION_SPACE):
+                        next_q_values[i][action] += reward_shaper.get_potential(next_states[i], action)
+                next_actions = np.argmax(next_q_values, axis=1)
 
-            next_q_values_target = target_estimator.predict(sess, next_states)
-            not_dones = np.invert(dones).astype(np.float32)
+                next_q_values_target = target_estimator.predict(sess, next_states)
+                not_dones = np.invert(dones).astype(np.float32)
 
-            targets_batch = (
-                rewards
-                + discount_factor * reward_shaper.get_potentials(next_states, next_actions)
-                - reward_shaper.get_potentials(states, actions)
-                + discount_factor * not_dones * next_q_values_target[np.arange(batch_size), next_actions])
+                targets = (
+                    rewards
+                    + discount_factor * reward_shaper.get_potentials(next_states, next_actions)
+                    - reward_shaper.get_potentials(states, actions)
+                    + discount_factor * not_dones * next_q_values_target[np.arange(batch_size), next_actions])
 
-            # Perform gradient descent update
-            q_estimator.update(sess, states, actions, targets_batch)
+                # Perform gradient descent update
+                predictions = q_estimator.update(sess, states, actions, targets)
+
+                # Update transition priorities
+                priors = np.abs(predictions - targets) + EPS_PRIORITY
+                replay_buffer.update_priorities(idx, priors)
 
             print("\rStep {}, episode {} ({}/{})".format(t, i_episode, total_t, num_steps), end="\t")
             sys.stdout.flush()
@@ -266,10 +278,14 @@ def deep_q_learning(sess,
 
 
 def main():
+    parser = argparse.ArgumentParser(description='Trains the agent by DQN')
+    parser.add_argument('experiment', help='specifies the experiment name')
+    args = parser.parse_args()
+
     env = DotaEnvironment()
 
     # Where we save our checkpoints and graphs
-    experiment_dir = os.path.abspath("./experiments/random")
+    experiment_dir = os.path.join(os.path.abspath("./experiments/"), args.experiment)
 
     tf.reset_default_graph()
     # Create a global step variable
@@ -295,12 +311,14 @@ def main():
             q_estimator=q_estimator,
             target_estimator=target_estimator,
             experiment_dir=experiment_dir,
-            num_steps=15000,
-            replay_memory_size=5000,
-            update_target_estimator_every=1000,
-            epsilon_start=1.0,
+            num_steps=50000,
+            replay_memory_size=10000,
+            epsilon_decay_steps=1,
+            epsilon_start=0.1,
             epsilon_end=0.1,
-            epsilon_decay_steps=10000,
+            update_target_estimator_every=1000,
+            update_q_values_every=4,
+            batch_size=32,
             restore=False)
 
 
