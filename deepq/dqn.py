@@ -185,7 +185,7 @@ def deep_q_learning(sess,
         beta0=0.4,
         save_dir=experiment_dir)
 
-    reward_shaper = ReplayRewardShaper('../replays-xyf/')
+    reward_shaper = ReplayRewardShaper('../replays/')
     reward_shaper.load()
 
     # The policy we're following
@@ -311,7 +311,7 @@ def main():
             q_estimator=q_estimator,
             target_estimator=target_estimator,
             experiment_dir=experiment_dir,
-            num_steps=50000,
+            num_steps=150000,
             replay_memory_size=10000,
             epsilon_decay_steps=1,
             epsilon_start=0.1,
