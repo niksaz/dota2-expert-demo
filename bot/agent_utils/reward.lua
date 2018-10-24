@@ -108,6 +108,8 @@ function is_near_ally_tower()
     end
 end
 
+local last_attack_time = bot:GetLastAttackTime()
+
 function Reward.get_reward(wrong_action)
 --    local my_health = get_my_health()
 --    local my_kills = get_my_kills()
@@ -127,10 +129,21 @@ function Reward.get_reward(wrong_action)
 --            - get_distance_to_tower_punishment() / 200
 --            - wrong_action * 30
 
-
     local reward = 0
+
     if is_near_ally_tower() == 1 then
         reward = reward + 1
+    end
+
+    local attack_time = bot:GetLastAttackTime()
+    if attack_time ~= nil and (last_attack_time == nil or attack_time >
+            last_attack_time) then
+        reward = reward + 5
+    end
+    last_attack_time = attack_time
+
+    if wrong_action == 1 then
+        reward = reward - 1
     end
 
 --    last_enemy_tower_health = enemy_tower_health
