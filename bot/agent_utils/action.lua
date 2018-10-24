@@ -11,7 +11,6 @@ local ACTION_ATTACK_TOWER = 4
 local ACTION_MOVE_DISCRETE = 5
 local ACTION_DO_NOTHING = 6
 
-local last_time_move = GameTime()
 local wrong_action = 0
 
 local ABILITY = {
@@ -21,22 +20,20 @@ local ABILITY = {
     bot:GetAbilityByName('nevermore_requiem')
 }
 
-function Action.last_time_moved()
-    return last_time_move
-end
-
 --- Move by the delta vector.
 -- @param delta_vector
 --
 function move_delta(delta_vector)
     print('MOVE DELTA', delta_vector[1], delta_vector[2])
 
-    last_time_move = GameTime()
-
     local position = bot:GetLocation()
     position[1] = position[1] + delta_vector[1]
     position[2] = position[2] + delta_vector[2]
-    bot:Action_MoveToLocation(position)
+    if IsLocationPassable(position) then
+        bot:Action_MoveToLocation(position)
+    else
+        wrong_action = 1
+    end
 end
 
 --- Move towards the specified angle.
@@ -45,7 +42,7 @@ end
 function move_discrete(direction)
     print('MOVE DISCRETE', direction)
 
-    local radius = 150
+    local radius = 100
     local angle = direction * (math.pi / 8)
     local cos_theta = math.cos(angle)
     local sin_theta = math.sin(angle)

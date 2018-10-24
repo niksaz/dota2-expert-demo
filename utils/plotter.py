@@ -1,10 +1,11 @@
 import pickle
+import argparse
 
 import matplotlib.pyplot as plt
 
 
-def plot_saved_rewards():
-    with open('saved_rewards.pkl', 'rb') as output_file:
+def plot_saved_rewards(rewards_file):
+    with open(rewards_file, 'rb') as output_file:
         reward = pickle.load(output_file)
 
     non_zero_rewards = []
@@ -21,5 +22,13 @@ def plot_saved_rewards():
     plt.show()
 
 
+def main():
+    parser = argparse.ArgumentParser(description='Plot the episode rewards.')
+    parser.add_argument('rewards_file', type=str,
+                        help='a path to the rewards file')
+    args = parser.parse_args()
+    plot_saved_rewards(args.rewards_file)
+
+
 if __name__ == '__main__':
-    plot_saved_rewards()
+    main()
