@@ -16,9 +16,9 @@ sys.path.append('../')
 from deepq import ReplayRewardShaper, Estimator, StatePreprocessor
 from dotaenv import DotaEnvironment
 
-STATE_SPACE = 3
-ACTION_SPACE = 16
-MAX_PRIORITY = 1
+STATE_SPACE = 7
+ACTION_SPACE = 19
+MAX_PRIORITY = 10
 EPS_PRIORITY = 1e-9
 
 Transition = namedlist(

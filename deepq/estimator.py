@@ -35,7 +35,7 @@ class Estimator:
         # Selected action index
         self.action_ind = tf.placeholder(shape=[None], dtype=tf.int32, name="actions")
 
-        layer_shape = 16
+        layer_shape = 20
 
         # Network
         fc1 = tf.layers.dense(inputs=self.X, units=layer_shape, activation=tf.nn.relu)
