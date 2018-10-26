@@ -36,6 +36,9 @@ class DotaEnvironment(Environment):
         self.terminal = terminal
         return state, reward, terminal
 
+    def close(self):
+        runner.close_game()
+
     @property
     def states(self):
         return dict(type='float', shape=self.observation_space)

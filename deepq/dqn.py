@@ -321,6 +321,8 @@ def main():
             batch_size=32,
             restore=False)
 
+    env.close()
+
 
 if __name__ == "__main__":
     main()
