@@ -24,28 +24,28 @@ local ABILITY = {
 -- @param delta_vector
 --
 function move_delta(delta_vector)
-    print('MOVE DELTA', delta_vector[1], delta_vector[2])
+    print('MOVE BY DELTA', delta_vector[1], delta_vector[2])
 
     local position = bot:GetLocation()
     position[1] = position[1] + delta_vector[1]
     position[2] = position[2] + delta_vector[2]
     if IsLocationPassable(position) then
-        bot:Action_MoveToLocation(position)
+        bot:Action_MoveDirectly(position)
     else
         wrong_action = 1
     end
 end
 
 --- Move towards the specified angle.
--- @param direction value from 0-15 that maps to direction/8*pi
+-- @param angle value in degrees
 --
-function move_discrete(direction)
-    print('MOVE DISCRETE', direction)
+function move_discrete(angle)
+    print('MOVE BY ANGLE', angle)
 
     local radius = 100
-    local angle = direction * (math.pi / 8)
-    local cos_theta = math.cos(angle)
-    local sin_theta = math.sin(angle)
+    local radians = angle * (math.pi / 180)
+    local cos_theta = math.cos(radians)
+    local sin_theta = math.sin(radians)
     move_delta({ radius * cos_theta, radius * sin_theta })
 end
 
@@ -120,7 +120,7 @@ function Action.execute_action(action_info)
         -- Consider params[1], params[2] as x, y of a delta vector
         move_delta(action_params)
     elseif action == ACTION_MOVE_DISCRETE then
-        -- Move towards the angle computed as (params[1] / 8 * pi)
+        -- Move towards the angle in degrees
         move_discrete(action_params[1])
     elseif action == ACTION_USE_ABILITY then
         -- Consider params[1] as an ability index
