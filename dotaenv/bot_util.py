@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 import numpy as np
+from dotaenv.codes import MOVES_TOTAL, ATTACK_CREEP, ATTACK_HERO, ATTACK_TOWER, STATE_PROJECT
 
 
 def action_to_json(action_internal):
@@ -21,18 +22,18 @@ def action_to_json(action_internal):
 
     bot_action = 6
     params = []
-    if 0 <= action_internal < 16:
+    if 0 <= action_internal < MOVES_TOTAL:
         # move
         bot_action = 5
-        params.append(int(action_internal))
-    elif action_internal == 16:
+        params.append(int(action_internal) * (360 / MOVES_TOTAL))
+    elif action_internal == ATTACK_CREEP:
         # attack the nearest creep
         bot_action = 2
         params.append(1)
-    elif action_internal == 17:
+    elif action_internal == ATTACK_HERO:
         # attack the enemy hero
         bot_action = 1
-    elif action_internal == 18:
+    elif action_internal == ATTACK_TOWER:
         # attack the enemy tower
         bot_action = 4
 
@@ -120,4 +121,4 @@ def vectorize_observation(observation):
     result.extend(observation['damage_info'])
 
     # taking values that are relevant for the current action space
-    return np.array(result)[[0, 1, 2, 11, 12, 19, 20]]
+    return np.array(result)[STATE_PROJECT]

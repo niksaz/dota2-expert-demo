@@ -15,9 +15,10 @@ sys.path.append('../')
 
 from deepq import ReplayRewardShaper, Estimator, StatePreprocessor
 from dotaenv import DotaEnvironment
+from dotaenv.codes import ATTACK_TOWER, STATE_PROJECT
 
-STATE_SPACE = 7
-ACTION_SPACE = 19
+STATE_SPACE = len(STATE_PROJECT)
+ACTION_SPACE = ATTACK_TOWER + 1
 MAX_PRIORITY = 10
 EPS_PRIORITY = 1e-9
 
