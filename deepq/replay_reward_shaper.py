@@ -68,7 +68,7 @@ class ReplayRewardShaper:
                 self.state_preprocessor.process(state0),
                 action,
                 self.state_preprocessor.process(state1)))
-        return demo[:250]
+        return demo
 
     def get_potential(self, state, action):
         best_value = 0

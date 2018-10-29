@@ -143,7 +143,7 @@ function Reward.get_reward(wrong_action)
     last_attack_time = attack_time
 
     if wrong_action == 1 then
-        reward = reward - 1
+        reward = reward - 0.1
     end
 
 --    last_enemy_tower_health = enemy_tower_health
