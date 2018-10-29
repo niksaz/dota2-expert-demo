@@ -13,7 +13,7 @@ import tensorflow as tf
 
 sys.path.append('../')
 
-from deepq import ReplayRewardShaper, Estimator, StatePreprocessor
+from deepq import ReplayRewardShaper, Estimator, StatePreprocessor, persistence
 from dotaenv import DotaEnvironment
 from dotaenv.codes import ATTACK_TOWER, STATE_PROJECT
 
@@ -156,19 +156,21 @@ def deep_q_learning(sess,
                     batch_size=32,
                     restore=True):
 
-    reward_dir = os.path.join(experiment_dir, "rewards")
-    if not os.path.exists(reward_dir):
-        os.makedirs(reward_dir)
-    reward_writer = tf.summary.FileWriter(reward_dir)
-
     # Create directories for checkpoints and summaries
     checkpoint_dir = os.path.join(experiment_dir, "checkpoints")
     if not os.path.exists(checkpoint_dir):
         os.makedirs(checkpoint_dir)
     checkpoint_path = os.path.join(checkpoint_dir, "model")
+    reward_dir = os.path.join(experiment_dir, "rewards")
+    if not os.path.exists(reward_dir):
+        os.makedirs(reward_dir)
+    reward_writer = tf.summary.FileWriter(reward_dir)
+
+    starting_episode = 0
 
     saver = tf.train.Saver()
     if restore:
+        starting_episode = persistence.get_last_episode(reward_dir)
         # Load a previous checkpoint if we find one
         latest_checkpoint = tf.train.latest_checkpoint(checkpoint_dir)
         if latest_checkpoint:
@@ -199,7 +201,7 @@ def deep_q_learning(sess,
 
     print('Training is starting...')
     # Training the agent
-    for i_episode in itertools.count():
+    for i_episode in itertools.count(starting_episode):
         episode_reward = 0
         multiplier = 1
 
