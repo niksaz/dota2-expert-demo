@@ -18,17 +18,15 @@ class DotaEnvironment(Environment):
 
     def reset(self):
         runner._bring_into_focus()
-        if self.terminal:
-            self.terminal = False
-            if self.restarts > 10:
-                self.restarts = 0
-                runner.close_game()
-                runner.make_sure_dota_is_launched()
-                runner.set_timescale()
-                runner.start_game()
-            else:
-                self.restarts += 1
-                runner.restart_game()
+        if self.restarts > 10:
+            self.restarts = 0
+            runner.close_game()
+            runner.make_sure_dota_is_launched()
+            runner.set_timescale()
+            runner.start_game()
+        else:
+            self.restarts += 1
+            runner.restart_game()
         return server.get_observation()[0]
 
     def execute(self, action):
