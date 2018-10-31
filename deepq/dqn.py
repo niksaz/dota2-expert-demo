@@ -314,7 +314,7 @@ def main():
             q_estimator=q_estimator,
             target_estimator=target_estimator,
             experiment_dir=experiment_dir,
-            num_steps=150000,
+            num_steps=200000,
             replay_memory_size=10000,
             epsilon_decay_steps=1,
             epsilon_start=0.1,
