@@ -1,15 +1,15 @@
 # Author: Mikita Sazanovich
 
+import argparse
 import itertools
 import os
 import pickle
 import sys
-import argparse
 from collections import deque
-from namedlist import namedlist
 
 import numpy as np
 import tensorflow as tf
+from namedlist import namedlist
 
 sys.path.append('../')
 
@@ -31,12 +31,14 @@ class PrioritizedReplayBuffer:
     """Reference paper: https://arxiv.org/pdf/1511.05952.pdf.
     """
 
-    def __init__(self, replay_memory_size, alpha, beta0, save_dir):
+    def __init__(self, replay_memory_size, alpha, beta0, reward_shaper, discount_factor, save_dir):
         """Initializes the replay buffer and caps the memory size to replay_memory_size.
         """
         self.replay_memory = deque(maxlen=replay_memory_size)
         self.alpha = alpha
         self.beta0 = beta0
+        self.reward_shaper = reward_shaper
+        self.discount_factor = discount_factor
         self.dump_path = os.path.join(save_dir, 'replay_buffer.pickle')
 
     def push(self, state, action, next_state, done, reward):
@@ -47,6 +49,9 @@ class PrioritizedReplayBuffer:
         """
         if len(state) != STATE_SPACE or len(next_state) != STATE_SPACE:
             return None
+        # Potential based-reward shaping
+        reward += (self.discount_factor*self.reward_shaper.get_state_potential(next_state) -
+                   self.reward_shaper.get_state_potential(state))
         transition = Transition(state, action, next_state, done, reward, MAX_PRIORITY)
         self.replay_memory.append(transition)
 
@@ -101,12 +106,11 @@ def copy_model_parameters(sess, estimator1, estimator2):
     sess.run(update_ops)
 
 
-def make_epsilon_greedy_policy(estimator, reward_shaper, acts):
+def make_epsilon_greedy_policy(estimator, acts):
     """
     Creates an epsilon-greedy policy based on a given Q-function approximator and epsilon.
     Args:
         estimator: An estimator that returns q values for a given state
-        reward_shaper: Reward shaper for a (state, action) pair.
         acts: Number of actions in the environment.
     Returns:
         A function that takes the (sess, state, epsilon) as an argument and returns
@@ -115,8 +119,6 @@ def make_epsilon_greedy_policy(estimator, reward_shaper, acts):
     def policy_fn(sess, state, epsilon):
         A = np.ones(acts, dtype=float) * epsilon / acts
         q_values = estimator.predict(sess, np.expand_dims(state, 0))[0]
-        for action in range(acts):
-            q_values[action] += reward_shaper.get_potential(state, action)
         best_action = np.argmax(q_values)
         A[best_action] += (1.0 - epsilon)
         return A
@@ -182,21 +184,22 @@ def deep_q_learning(sess,
     # The epsilon decay schedule
     epsilons = np.linspace(epsilon_start, epsilon_end, epsilon_decay_steps)
 
+    reward_shaper = ReplayRewardShaper('../replays/')
+    reward_shaper.load()
+
     replay_buffer = PrioritizedReplayBuffer(
         replay_memory_size,
         alpha=0.6,
         beta0=0.4,
+        reward_shaper=reward_shaper,
+        discount_factor=discount_factor,
         save_dir=experiment_dir)
 
-    reward_shaper = ReplayRewardShaper('../replays/')
-    reward_shaper.load()
-
     # The policy we're following
-    policy = make_epsilon_greedy_policy(q_estimator, reward_shaper, ACTION_SPACE)
+    policy = make_epsilon_greedy_policy(q_estimator, ACTION_SPACE)
 
     # Populate the replay memory with initial experience
-    action_sampler = lambda state: policy(
-        sess, state, epsilons[min(total_t, epsilon_decay_steps-1)])
+    action_sampler = lambda state: policy(sess, state, epsilons[min(total_t, epsilon_decay_steps-1)])
     populate_replay_buffer(replay_buffer, action_sampler, env)
 
     print('Training is starting...')
@@ -233,6 +236,8 @@ def deep_q_learning(sess,
                 copy_model_parameters(sess, q_estimator, target_estimator)
                 print("\nCopied model parameters to target network.")
 
+            print('\rState potential:', reward_shaper.get_state_potential(state))
+
             # Take a step
             action_probs = policy(sess, state, eps)
             action = np.random.choice(np.arange(len(action_probs)), p=action_probs)
@@ -250,21 +255,12 @@ def deep_q_learning(sess,
                 samples, idx = replay_buffer.sample(batch_size)
                 states, actions, next_states, dones, rewards, _ = map(np.array, zip(*samples))
 
+                not_dones = np.invert(dones).astype(np.float32)
                 # Calculate q values and targets (Double DQN)
                 next_q_values = q_estimator.predict(sess, next_states)
-                for i in range(batch_size):
-                    for action in range(ACTION_SPACE):
-                        next_q_values[i][action] += reward_shaper.get_potential(next_states[i], action)
-                next_actions = np.argmax(next_q_values, axis=1)
-
-                next_q_values_target = target_estimator.predict(sess, next_states)
-                not_dones = np.invert(dones).astype(np.float32)
-
-                targets = (
-                    rewards
-                    + discount_factor * reward_shaper.get_potentials(next_states, next_actions)
-                    - reward_shaper.get_potentials(states, actions)
-                    + discount_factor * not_dones * next_q_values_target[np.arange(batch_size), next_actions])
+                best_actions = np.argmax(next_q_values, axis=1)
+                targets = (rewards +
+                           discount_factor * not_dones * next_q_values[np.arange(batch_size), best_actions])
 
                 # Perform gradient descent update
                 predictions = q_estimator.update(sess, states, actions, targets)
@@ -316,8 +312,8 @@ def main():
             experiment_dir=experiment_dir,
             num_steps=200000,
             replay_memory_size=10000,
-            epsilon_decay_steps=1,
-            epsilon_start=0.1,
+            epsilon_decay_steps=50000,
+            epsilon_start=1.0,
             epsilon_end=0.1,
             update_target_estimator_every=1000,
             update_q_values_every=4,
