@@ -259,8 +259,10 @@ def deep_q_learning(sess,
                 # Calculate q values and targets (Double DQN)
                 next_q_values = q_estimator.predict(sess, next_states)
                 best_actions = np.argmax(next_q_values, axis=1)
-                targets = (rewards +
-                           discount_factor * not_dones * next_q_values[np.arange(batch_size), best_actions])
+                next_q_values_target = target_estimator.predict(sess, next_states)
+                targets = (
+                    rewards +
+                    discount_factor * not_dones * next_q_values_target[np.arange(batch_size), best_actions])
 
                 # Perform gradient descent update
                 predictions = q_estimator.update(sess, states, actions, targets)
