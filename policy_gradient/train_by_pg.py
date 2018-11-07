@@ -20,8 +20,8 @@ def create_dota_agent():
                    episodes=10000,
                    restore=False,
                    batch_size=100,
-                   eps=1.00,
-                   eps_update=0.999)
+                   eps=0.99,
+                   eps_update=0.99)
 
 
 def main():

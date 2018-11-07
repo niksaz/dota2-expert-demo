@@ -69,18 +69,5 @@ class ReplayBuffer:
                [a for s, a, r in data], \
                [r for s, a, r in data]
 
-    def get_batch(self, i, batch_size):
-        """
-        Get batch of data.
-        :param i: from
-        :param batch_size: batch size
-        :return: 3 iterators: states, actions, rewards
-        """
-        size = len(self.data)
-        data = list(itertools.islice(self.data, i, min(batch_size + i, size)))
-        return [s for s, a, r in data], \
-               [a for s, a, r in data], \
-               [r for s, a, r in data]
-
     def shuffle_data(self):
         shuffle(shuffle(self.data))

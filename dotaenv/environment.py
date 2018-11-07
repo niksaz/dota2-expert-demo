@@ -2,13 +2,14 @@ from tensorforce.environments import Environment
 
 import dotaenv.bot_server as server
 import dotaenv.dota_runner as runner
+from dotaenv.codes import STATE_DIM, MOVES_TOTAL
 
 
 class DotaEnvironment(Environment):
 
     def __init__(self):
-        self.action_space = (16,)
-        self.observation_space = (83,)
+        self.action_space = (MOVES_TOTAL,)
+        self.observation_space = (STATE_DIM,)
         self.terminal = False
         self.restarts = 0
         server.run_app()
@@ -37,6 +38,9 @@ class DotaEnvironment(Environment):
     def close(self):
         runner.close_game()
 
+    def __str__(self):
+        return 'Dota 2 Environment'
+
     @property
     def states(self):
         return dict(type='float', shape=self.observation_space)
@@ -44,6 +48,3 @@ class DotaEnvironment(Environment):
     @property
     def actions(self):
         return dict(type='int', num_actions=self.action_space[0])
-
-    def __str__(self):
-        return 'Dota 2 Environment'

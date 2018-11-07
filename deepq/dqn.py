@@ -15,9 +15,9 @@ sys.path.append('../')
 
 from deepq import ReplayRewardShaper, Estimator, StatePreprocessor, persistence
 from dotaenv import DotaEnvironment
-from dotaenv.codes import ATTACK_TOWER, STATE_PROJECT
+from dotaenv.codes import ATTACK_TOWER, STATE_DIM
 
-STATE_SPACE = len(STATE_PROJECT)
+STATE_SPACE = STATE_DIM
 ACTION_SPACE = ATTACK_TOWER + 1
 MAX_PRIORITY = 10
 EPS_PRIORITY = 1e-9
@@ -236,7 +236,7 @@ def deep_q_learning(sess,
                 copy_model_parameters(sess, q_estimator, target_estimator)
                 print("\nCopied model parameters to target network.")
 
-            print('\rState potential:', reward_shaper.get_state_potential(state))
+            print('State potential:', reward_shaper.get_state_potential(state))
 
             # Take a step
             action_probs = policy(sess, state, eps)
@@ -314,13 +314,13 @@ def main():
             experiment_dir=experiment_dir,
             num_steps=200000,
             replay_memory_size=10000,
-            epsilon_decay_steps=50000,
-            epsilon_start=1.0,
-            epsilon_end=0.1,
+            epsilon_decay_steps=200000,
+            epsilon_start=0.3,
+            epsilon_end=0.01,
             update_target_estimator_every=1000,
             update_q_values_every=4,
             batch_size=32,
-            restore=False)
+            restore=True)
 
     env.close()
 

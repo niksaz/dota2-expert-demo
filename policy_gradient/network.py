@@ -38,7 +38,7 @@ class Network:
             self.saver.restore(self.session, 'saved_model/model.ckpt')
 
     def build(self, input_shape, output_shape, learning_rate=0.01,
-              layer_shape=9):
+              layer_shape=20):
         """
         Build action classifier network for policy gradient algorithm.
 
@@ -61,10 +61,10 @@ class Network:
         fc1 = tf.layers.dense(inputs=in_layer, units=layer_shape, activation=tf.nn.relu)
         fc1_print = tf.Print(fc1, [fc1], message='fc1', summarize=layer_shape)
 
-        # fc2 = tf.layers.dense(inputs=fc1, units=layer_shape, activation=tf.nn.relu)
-        # fc2_print = tf.Print(fc2, [fc2], message='fc2', summarize=layer_shape)
+        fc2 = tf.layers.dense(inputs=fc1_print, units=layer_shape, activation=tf.nn.relu)
+        fc2_print = tf.Print(fc2, [fc2], message='fc2', summarize=layer_shape)
 
-        fc3 = tf.layers.dense(inputs=fc1_print, units=output_shape, activation=None)
+        fc3 = tf.layers.dense(inputs=fc2_print, units=output_shape, activation=None)
         fc3_print = tf.Print(fc3, [fc3], message='fc3', summarize=output_shape)
 
         # predict operation

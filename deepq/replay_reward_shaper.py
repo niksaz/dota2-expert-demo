@@ -5,9 +5,10 @@ import pickle
 import numpy as np
 
 from deepq import StatePreprocessor
-from dotaenv.codes import STATE_PROJECT
+from dotaenv.codes import STATE_PROJECT, STATE_DIM
 
 EPS = 1e-1
+K=10
 
 
 class ReplayRewardShaper:
@@ -30,7 +31,6 @@ class ReplayRewardShaper:
                 replay = pickle.load(dump_file)
             demo = self.__process_replay(replay)
             self.demos.append(demo)
-            print(name)
             # Only a single demo for now
             break
 
@@ -45,11 +45,13 @@ class ReplayRewardShaper:
         return demo
 
     def get_state_potential(self, state):
+        if len(state) != STATE_DIM:
+            return 0.0
         for demo in self.demos:
             for i in reversed(range(len(demo))):
-                diff = np.linalg.norm(demo[i] - state)
+                diff = np.linalg.norm(demo[i][:2] - state[:2])
                 if diff < EPS:
-                    return i
+                    return K*i
         return 0
 
 

@@ -29,7 +29,10 @@ function move_delta(delta_vector)
     local position = bot:GetLocation()
     position[1] = position[1] + delta_vector[1]
     position[2] = position[2] + delta_vector[2]
-    if IsLocationPassable(position) then
+    local diff = position[1] - position[2]
+    local sq = diff * diff
+    print('sq diff ', sq)
+    if (IsLocationPassable(position) and (sq < 1500000)) then
         bot:Action_MoveDirectly(position)
     else
         wrong_action = 1

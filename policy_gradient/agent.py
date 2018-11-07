@@ -8,12 +8,15 @@ from sklearn.preprocessing import OneHotEncoder
 from policy_gradient.analyze_model import print_network_weights
 from policy_gradient.network import Network
 from policy_gradient.replay_buffer import ReplayBuffer
+from dotaenv.codes import STATE_DIM, MOVES_TOTAL
+from deepq.replay_reward_shaper import ReplayRewardShaper
+from deepq.state_preprocessor import StatePreprocessor
 
 logger = logging.getLogger('DotaRL.PGAgent')
 logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 
-input_shape = 3
-output_shape = 16
+input_shape = STATE_DIM
+output_shape = MOVES_TOTAL
 
 
 class PGAgent:
@@ -52,8 +55,8 @@ class PGAgent:
     def show_performance(self):
         for episode in range(self.episodes):
             # sample data
-            states, actions, rewards, terminal = self.sample_episode(
-                batch_size=self.batch_size, eps=0.00)
+            states, actions, rewards, next_states, terminal = \
+                self.sample_episode(batch_size=self.batch_size, eps=0.00)
             rewards = np.array(rewards, dtype='float32')
 
             temp = 'Finished episode {ep} with total reward {rew}. eps={eps}'
@@ -61,11 +64,14 @@ class PGAgent:
                                      eps=self.eps))
 
     def train(self):
+        reward_shaper = ReplayRewardShaper('../replays/')
+        reward_shaper.load()
+
         episode_rewards = []
         for episode in range(self.episodes):
             # sample data
-            states, actions, rewards, terminal = self.sample_episode(
-                batch_size=self.batch_size, eps=self.eps)
+            states, actions, next_states, rewards, terminal = \
+                self.sample_episode(batch_size=self.batch_size, eps=self.eps)
             episode_rewards.extend(rewards)
 
             if terminal:
@@ -82,45 +88,54 @@ class PGAgent:
 
             rewards = np.array(rewards, dtype='float32')
             temp = 'Finished episode {ep} with total reward {rew}. eps={eps}'
-            logger.debug(temp.format(ep=episode, rew=np.sum(rewards),
-                                     eps=self.eps))
+            logger.debug(temp.format(ep=episode, rew=np.sum(rewards), eps=self.eps))
 
-            # Preprocess rewards
+            # Potential-based reward shaping from the demo
+            for i in range(len(states)):
+                rewards[i] += (
+                        self.discount * reward_shaper.get_state_potential(next_states[i]) -
+                        reward_shaper.get_state_potential(states[i]))
+
+            # Discount rewards
             disc_rewards = self.disc_rewards(rewards)
-            norm_rewards = self.normalize_rewards(disc_rewards)
 
             # Extend replay buffer with sampled data
-            self.replay_buffer.extend(zip(states, actions, norm_rewards))
+            self.replay_buffer.extend(zip(states, actions, disc_rewards))
 
             # Update the parameter for epsilon-greedy strategy
             self.eps *= self.eps_update
 
             # If there is enough data in replay buffer, train the model on it
             if len(self.replay_buffer) >= self.batch_size:
-                self.train_network(batch=self.replay_buffer.get_data(self.batch_size))
+                for i in range(10):
+                    states, actions, rewards = self.replay_buffer.get_data(self.batch_size)
+                    rewards = self.normalize_rewards(rewards)
+                    self.train_network((states, actions, rewards))
 
             print_network_weights(self.network)
-
         logger.debug('Finished training.')
 
     def sample_episode(self, batch_size, eps):
         states = []
         actions = []
+        next_states = []
         rewards = []
         terminal = False
         state = self.env.reset()
+        state = StatePreprocessor.process(state)
         for i in range(batch_size):
+            states.append(state)
             action = self.get_action(state=state, eps=eps)
+            actions.append(action)
             state, terminal_action, reward = self.env.execute(action=action)
+            state = StatePreprocessor.process(state)
+            next_states.append(state)
+            rewards.append(reward)
             terminal = terminal_action
             if terminal_action:
                 break
             logger.debug('Step {step} state: {state}, action: {action}.'.format(step=i, rew=reward, action=action, state=state))
-            states.append(state)
-            actions.append(action)
-            rewards.append(reward)
-
-        return states, actions, rewards, terminal
+        return states, actions, next_states, rewards, terminal
 
     def get_action(self, state, eps):
         """
@@ -149,24 +164,6 @@ class PGAgent:
         if abs(std) > 1e-9:
             norm_rewards /= std
         return norm_rewards
-
-    def train_on_replay(self, batch_size=500, epochs=25):
-        self.replay_buffer.load_data()
-        # states, actions, rewards = self.replay_buffer.get_data(batch_size=len(self.replay_buffer))
-        # rewards = np.array(rewards, dtype='float32')
-
-        # discount and normalize rewards
-        # rewards = self.discount_rewards(rewards=rewards, gamma=self.discount)
-        # rewards = self.normalize_rewards(rewards=rewards)
-        # self.replay_buffer.extend(zip(states, actions, rewards))
-
-        for epoch in range(epochs):
-            i = 0
-            while i < len(self.replay_buffer):
-                batch = self.replay_buffer.get_batch(i, batch_size=batch_size)
-                self.train_network(batch=batch)
-                i += batch_size
-            logger.debug('Training: epoch {epoch}.'.format(epoch=epoch))
 
     def train_network(self, batch):
         states, actions, rewards = batch
