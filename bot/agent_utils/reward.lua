@@ -2,14 +2,6 @@ Reward = {}
 
 local bot = GetBot()
 
-local enemy_tower = GetTower(TEAM_DIRE, TOWER_MID_1);
-local ally_tower = GetTower(TEAM_RADIANT, TOWER_MID_1);
-if GetTeam() == TEAM_DIRE then
-    local temp = ally_tower
-    ally_tower = enemy_tower
-    enemy_tower = temp
-end
-
 local this_player_id = bot:GetPlayerID()
 
 local last_enemy_tower_health = 1300
@@ -101,6 +93,13 @@ function recently_damaged_enemy()
 end
 
 function is_near_ally_tower()
+    local ally_tower = GetTower(TEAM_RADIANT, TOWER_MID_1)
+    if ally_tower == nil then
+        return 0
+    end
+    print('pos', bot:GetLocation())
+    print('tower', ally_tower:GetLocation())
+    print('tow dst', GetUnitToUnitDistance(bot, ally_tower))
     if GetUnitToUnitDistance(bot, ally_tower) < 1000 then
         return 1
     else

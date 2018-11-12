@@ -320,7 +320,7 @@ def main():
             update_target_estimator_every=1000,
             update_q_values_every=4,
             batch_size=32,
-            restore=True)
+            restore=False)
 
     env.close()
 

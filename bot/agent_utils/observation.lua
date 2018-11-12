@@ -38,11 +38,19 @@ end
 
 -- Obtain towers' info.
 function get_towers_info()
-    local ally_tower = get_ally_tower()
     local enemy_tower = get_enemy_tower()
+    local ally_tower = get_ally_tower()
+    local enemy_tower_health = 0
+    if enemy_tower ~= nil then
+        enemy_tower_health = enemy_tower:GetHealth()
+    end
+    local ally_tower_health = 0
+    if ally_tower ~= nil then
+        ally_tower_health = ally_tower:GetHealth()
+    end
     return {
-        enemy_tower:GetHealth(),
-        ally_tower:GetHealth()
+        enemy_tower_health,
+        ally_tower_health
     }
 end
 
