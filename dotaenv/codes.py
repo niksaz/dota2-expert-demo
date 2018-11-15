@@ -1,6 +1,6 @@
 # Author: Mikita Sazanovich
 
-STATE_PROJECT = [0, 1] #, 11, 12, 19, 20]
+STATE_PROJECT = [0, 1, 2, 11, 12, 19, 20]
 STATE_DIM = len(STATE_PROJECT)
 
 MOVES_TOTAL = 20

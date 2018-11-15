@@ -316,7 +316,7 @@ def main():
             replay_memory_size=10000,
             epsilon_decay_steps=200000,
             epsilon_start=0.3,
-            epsilon_end=0.01,
+            epsilon_end=0.1,
             update_target_estimator_every=1000,
             update_q_values_every=4,
             batch_size=32,

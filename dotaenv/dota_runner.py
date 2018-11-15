@@ -3,103 +3,106 @@ import subprocess
 import pyautogui as gui
 
 
+RIGHT_BOT_BUTTON_X = 906
+RIGHT_BOT_BUTTON_Y = 809
+
+INTERVAL = 0.01
+DURATION = 0.5
+PAUSE = 1
+
+
 def make_sure_dota_is_launched():
     if _is_dota_launched():
-        _bring_into_focus()
+        _focus_dota_window()
         return
 
-    # bring up spotlight search
-    gui.hotkey('command', 'space')
-    time.sleep(1)
+    _focus_steam_window()
 
-    # search for steam (assuming it is already launched)
-    gui.typewrite('steam', interval=0.1)
-    gui.press('enter')
-    time.sleep(1)
+    # Search for Dota 2 in the library
+    gui.click(x=118, y=108)
+    gui.typewrite('dota', interval=INTERVAL)
 
-    # search for Dota 2 in the library
-    gui.click(x=50, y=110)
-    gui.typewrite('dota', interval=0.1)
-
-    # press play
-    gui.click(x=335, y=225, pause=20)
+    # Press play
+    gui.click(x=400, y=230, pause=30)
 
 
 def start_game():
-    # start
-    gui.click(x=974, y=668, pause=0.5)
-    # create lobby
-    gui.click(x=892, y=353, pause=2)
-    # join coaches
-    gui.click(x=899, y=408, pause=2)
-    # start game
-    gui.click(x=974, y=668, pause=1)
+    # Start
+    gui.click(x=RIGHT_BOT_BUTTON_X, y=RIGHT_BOT_BUTTON_Y, duration=DURATION, pause=PAUSE)
+    # Create lobby
+    gui.click(x=858, y=418, pause=PAUSE)
+    # Join coaches
+    gui.click(x=807, y=484, pause=PAUSE)
+    # Start game
+    gui.click(x=RIGHT_BOT_BUTTON_X, y=RIGHT_BOT_BUTTON_Y, pause=PAUSE)
 
 
 def set_timescale():
-    gui.press('\\', pause=0.1)
-    gui.typewrite('sv_cheats 1', interval=0.05, pause=0.3)
-    gui.press('enter', pause=0.1)
-    gui.typewrite('host_timescale 5', interval=0.05, pause=0.3)
-    gui.press('enter', pause=0.1)
-    gui.press('\\', pause=0.5)
+    gui.press('\\', pause=PAUSE)
+    gui.typewrite('sv_cheats 1', interval=INTERVAL)
+    gui.press('enter', pause=PAUSE)
+    gui.typewrite('host_timescale 8', interval=INTERVAL)
+    gui.press('enter', pause=PAUSE)
+    gui.press('\\', pause=PAUSE)
 
 
 def restart_game():
-    _bring_into_focus()
+    _focus_dota_window()
 
-    gui.press('\\', pause=0.1)
-    gui.typewrite('restart', interval=0.05, pause=0.3)
-    gui.press('enter', pause=0.1)
-    gui.press('\\', pause=0.1)
+    # Restart the game from the console
+    gui.press('\\', pause=PAUSE)
+    gui.typewrite('restart', interval=INTERVAL)
+    gui.press('enter', pause=PAUSE)
+    gui.press('\\', pause=PAUSE)
     time.sleep(10)
-    # Press keys to speed up Dota 2 launching
-    gui.press('esc', pause=1)
-    gui.press('esc', pause=1)
-    gui.press('esc', pause=1)
-    gui.press('esc', pause=1)
-    gui.press('esc', pause=1)
+
+    # Start the game timer right away
+    gui.press('\\', pause=PAUSE)
+    gui.typewrite('dota_dev forcegamestart', interval=INTERVAL)
+    # gui.press('enter', pause=PAUSE)
+    # gui.typewrite('dota_dev forcecreepspawn', interval=INTERVAL)
+    gui.press('enter', pause=PAUSE)
+    gui.press('\\', pause=PAUSE)
 
 
 def close_game():
-    _bring_into_focus()
+    _focus_dota_window()
 
-    # bring up the menu
-    gui.click(x=373, y=223, pause=1)
-    # disconnect
-    gui.click(x=980, y=671, pause=1)
-    # confirm it
-    gui.click(x=680, y=488, pause=2)
-    # exit
-    gui.click(x=1068, y=228, pause=1)
-    # confirm it and wait for complete closure
-    gui.click(x=680, y=475, pause=15)
-
-
-def _bring_into_focus():
-    gui.moveTo(967, 1000, pause=0.8)
-    gui.click(967, 1000, pause=0.1)
-    gui.click(750, 400, pause=0.1)
+    # Bring up the menu
+    gui.click(x=256, y=256, pause=2*PAUSE)
+    # Disconnect
+    gui.click(x=RIGHT_BOT_BUTTON_X, y=RIGHT_BOT_BUTTON_Y, pause=2*PAUSE)
+    # Confirm it
+    gui.click(x=585, y=585, pause=4*PAUSE)
+    # Exit
+    gui.click(x=1022, y=256, pause=2*PAUSE)
+    # Confirm it and wait for complete closure
+    gui.click(x=580, y=568, pause=15)
 
 
-def _is_dota_launched():
-    return _find_process("dota").find(b"dota 2 beta") != -1
-
-
-def _find_process(process_name):
-    ps = subprocess.Popen("ps -ef | grep " + process_name,
-                          shell=True, stdout=subprocess.PIPE)
+def _run_cmd(cmd):
+    ps = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE)
     output = ps.stdout.read()
     ps.stdout.close()
     ps.wait()
-    return output
+    return output.decode('utf-8')
 
 
-def run():
-    make_sure_dota_is_launched()
-    set_timescale()
-    start_game()
+def _is_dota_launched():
+    return _run_cmd('ps -ef | grep dota').find('dota 2 beta') != -1
 
 
-if __name__ == '__main__':
-    run()
+def _focus_dota_window():
+    _run_cmd('wmctrl -a "Dota 2"')
+    time.sleep(DURATION)
+
+
+def _focus_steam_window():
+    # wmctrl detects the Steam's window as N/A.
+    windows = _run_cmd('wmctrl -l')
+    for window_info in windows.splitlines():
+        if window_info.find('N/A') != -1:
+            window_id = window_info[:10]
+            _run_cmd('wmctrl -i -a ' + window_id)
+    time.sleep(DURATION)
+

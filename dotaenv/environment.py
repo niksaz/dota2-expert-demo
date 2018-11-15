@@ -1,3 +1,5 @@
+import time
+
 from tensorforce.environments import Environment
 
 import dotaenv.bot_server as server
@@ -16,18 +18,11 @@ class DotaEnvironment(Environment):
         runner.make_sure_dota_is_launched()
         runner.set_timescale()
         runner.start_game()
+        time.sleep(20)
 
     def reset(self):
-        runner._bring_into_focus()
-        if self.restarts > 10:
-            self.restarts = 0
-            runner.close_game()
-            runner.make_sure_dota_is_launched()
-            runner.set_timescale()
-            runner.start_game()
-        else:
-            self.restarts += 1
-            runner.restart_game()
+        runner._focus_dota_window()
+        runner.restart_game()
         return server.get_observation()[0]
 
     def execute(self, action):
