@@ -1,5 +1,6 @@
 Action = {}
 
+local Resolver = require(GetScriptDirectory() .. '/agent_utils/resolver')
 local bot = GetBot()
 
 local NEARBY_RADIUS = 1500
@@ -25,31 +26,21 @@ local ABILITY = {
 --
 function move_delta(delta_vector)
     print('MOVE BY DELTA', delta_vector[1], delta_vector[2])
-
     local position = bot:GetLocation()
-    position[1] = position[1] + delta_vector[1]
-    position[2] = position[2] + delta_vector[2]
-    local diff = position[1] - position[2]
-    local sq = diff * diff
-    print('sq diff ', sq)
-    if (IsLocationPassable(position) and (sq < 1500000)) then
-        bot:Action_MoveDirectly(position)
+    if Resolver.can_move_by_delta(position, delta_vector) then
+        bot:Action_MoveDirectly(position + delta_vector)
     else
         wrong_action = 1
     end
 end
 
---- Move towards the specified angle.
--- @param angle value in degrees
+--- Move towards the direction.
+-- @param dir code
 --
-function move_discrete(angle)
-    print('MOVE BY ANGLE', angle)
-
-    local radius = 100
-    local radians = angle * (math.pi / 180)
-    local cos_theta = math.cos(radians)
-    local sin_theta = math.sin(radians)
-    move_delta({ radius * cos_theta, radius * sin_theta })
+function move_discrete(dir)
+    print('MOVE BY DIR', dir)
+    local delta_vector = Resolver.delta_vector_for_dir(dir)
+    move_delta(delta_vector)
 end
 
 --- Use ability.
@@ -144,4 +135,4 @@ function Action.execute_action(action_info)
     return wrong_action
 end
 
-return Action;
+return Action

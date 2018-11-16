@@ -25,7 +25,8 @@ def action_to_json(action_internal):
     if 0 <= action_internal < MOVE_ACTIONS_TOTAL:
         # move
         bot_action = 5
-        params.append(int(action_internal) * (360 / MOVE_ACTIONS_TOTAL))
+        dir_code = int(action_internal)
+        params.append(dir_code)
     elif action_internal == ATTACK_CREEP:
         # attack the nearest creep
         bot_action = 2

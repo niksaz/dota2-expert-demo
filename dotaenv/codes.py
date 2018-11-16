@@ -1,6 +1,7 @@
 # Author: Mikita Sazanovich
 
-STATE_PROJECT = [0, 1, 2]  # [11, 12, 19, 20]
+# Taking first 3 dimensions
+STATE_PROJECT = [0, 1, 2]
 STATE_DIM = len(STATE_PROJECT)
 
 # First actions are movement actions towards (360 / total * action_number)°

@@ -157,4 +157,4 @@ function Reward.get_reward(wrong_action)
     return reward
 end
 
-return Reward;
+return Reward
