@@ -1,7 +1,7 @@
 # Author: Mikita Sazanovich
 
 # Taking first 2 dimensions
-STATE_PROJECT = range(2)
+STATE_PROJECT = range(10)
 SHAPER_STATE_PROJECT = range(2)
 STATE_DIM = len(STATE_PROJECT)
 

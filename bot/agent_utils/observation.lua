@@ -1,14 +1,16 @@
 -- Observation module
+
 local Observation = {}
 
+local Resolver = require(GetScriptDirectory() .. '/agent_utils/resolver')
 local bot = GetBot()
 local bot_player_id = bot:GetPlayerID()
 
 local NEARBY_RADIUS = 1500
-local ability1 = bot:GetAbilityByName('nevermore_shadowraze1')
-local ability2 = bot:GetAbilityByName('nevermore_shadowraze2')
-local ability3 = bot:GetAbilityByName('nevermore_shadowraze3')
-local ability4 = bot:GetAbilityByName('nevermore_requiem')
+--local ability1 = bot:GetAbilityByName('nevermore_shadowraze1')
+--local ability2 = bot:GetAbilityByName('nevermore_shadowraze2')
+--local ability3 = bot:GetAbilityByName('nevermore_shadowraze3')
+--local ability4 = bot:GetAbilityByName('nevermore_requiem')
 
 -- Obtain damage info.
 function get_damage_info()
@@ -56,41 +58,44 @@ end
 
 -- Obtain bot's info (specified for Nevermore).
 function get_self_info()
-    local ability1_dmg = 0
-    if ability1:IsFullyCastable() then
-        ability1_dmg = 1
-    end
-
-    local ability2_dmg = 0
-    if ability2:IsFullyCastable() then
-        ability2_dmg = 1
-    end
-
-    local ability3_dmg = 0
-    if ability3:IsFullyCastable() then
-        ability3_dmg = 1
-    end
-
-    local ability4_dmg = 0
-    if ability4:IsFullyCastable() then
-        ability4_dmg = 1
-    end
+--    local ability1_dmg = 0
+--    if ability1:IsFullyCastable() then
+--        ability1_dmg = 1
+--    end
+--
+--    local ability2_dmg = 0
+--    if ability2:IsFullyCastable() then
+--        ability2_dmg = 1
+--    end
+--
+--    local ability3_dmg = 0
+--    if ability3:IsFullyCastable() then
+--        ability3_dmg = 1
+--    end
+--
+--    local ability4_dmg = 0
+--    if ability4:IsFullyCastable() then
+--        ability4_dmg = 1
+--    end
 
     -- Bot's atk, hp, mana, abilities, position x, position y
     local self_position = bot:GetLocation()
-    local self_info = {
-        self_position[1],
-        self_position[2],
-        bot:GetFacing(),
-        bot:GetAttackDamage(),
-        bot:GetLevel(),
-        bot:GetHealth(),
-        bot:GetMana(),
-        ability1_dmg,
-        ability2_dmg,
-        ability3_dmg,
-        ability4_dmg,
-    }
+    local self_info = {}
+    self_info[1] = self_position[1]
+    self_info[2] = self_position[2]
+    for dir=0,(Resolver.total_dirs-1) do
+        local dir_vector = Resolver.delta_vector_for_dir(dir)
+        self_position[3+dir] = Resolver.can_move_by_delta(self_position, dir_vector) and 1 or 0
+    end
+--        bot:GetFacing(),
+--        bot:GetAttackDamage(),
+--        bot:GetLevel(),
+--        bot:GetHealth(),
+--        bot:GetMana(),
+--        ability1_dmg,
+--        ability2_dmg,
+--        ability3_dmg,
+--        ability4_dmg,
 
     return self_info
 end
