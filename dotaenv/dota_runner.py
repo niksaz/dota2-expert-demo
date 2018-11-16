@@ -45,7 +45,7 @@ def restart_game():
     gui.typewrite('restart', interval=INTERVAL)
     gui.press('enter', pause=PAUSE)
     gui.press('\\', pause=PAUSE)
-    time.sleep(10)
+    time.sleep(12)
 
     # Start the game timer right away
     gui.press('\\', pause=PAUSE)
