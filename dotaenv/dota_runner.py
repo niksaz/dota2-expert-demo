@@ -11,19 +11,19 @@ DURATION = 0.5
 PAUSE = 1
 
 
-def make_sure_dota_is_launched():
+def prepare_dota_client():
     if _is_dota_launched():
         _focus_dota_window()
-        return
+    else:
+        _focus_steam_window()
 
-    _focus_steam_window()
+        # Search for Dota 2 in the library
+        gui.click(x=118, y=108)
+        gui.typewrite('dota', interval=INTERVAL)
 
-    # Search for Dota 2 in the library
-    gui.click(x=118, y=108)
-    gui.typewrite('dota', interval=INTERVAL)
-
-    # Press play
-    gui.click(x=400, y=230, pause=30)
+        # Press play
+        gui.click(x=400, y=230, pause=30)
+    _enable_cheats()
 
 
 def start_game():
@@ -37,20 +37,11 @@ def start_game():
     gui.click(x=RIGHT_BOT_BUTTON_X, y=RIGHT_BOT_BUTTON_Y, pause=PAUSE)
 
 
-def set_timescale():
-    gui.press('\\', pause=PAUSE)
-    gui.typewrite('sv_cheats 1', interval=INTERVAL)
-    gui.press('enter', pause=PAUSE)
-    gui.typewrite('host_timescale 8', interval=INTERVAL)
-    gui.press('enter', pause=PAUSE)
-    gui.press('\\', pause=PAUSE)
-
-
 def restart_game():
-    _focus_dota_window()
-
-    # Restart the game from the console
+    # Slow down the time and restart the game
     gui.press('\\', pause=PAUSE)
+    gui.typewrite('host_timescale 6', interval=INTERVAL)
+    gui.press('enter', pause=PAUSE)
     gui.typewrite('restart', interval=INTERVAL)
     gui.press('enter', pause=PAUSE)
     gui.press('\\', pause=PAUSE)
@@ -59,8 +50,8 @@ def restart_game():
     # Start the game timer right away
     gui.press('\\', pause=PAUSE)
     gui.typewrite('dota_dev forcegamestart', interval=INTERVAL)
-    # gui.press('enter', pause=PAUSE)
-    # gui.typewrite('dota_dev forcecreepspawn', interval=INTERVAL)
+    gui.press('enter', pause=PAUSE)
+    gui.typewrite('host_timescale 10', interval=INTERVAL)
     gui.press('enter', pause=PAUSE)
     gui.press('\\', pause=PAUSE)
 
@@ -106,3 +97,9 @@ def _focus_steam_window():
             _run_cmd('wmctrl -i -a ' + window_id)
     time.sleep(DURATION)
 
+
+def _enable_cheats():
+    gui.press('\\', pause=PAUSE)
+    gui.typewrite('sv_cheats 1', interval=INTERVAL)
+    gui.press('enter', pause=PAUSE)
+    gui.press('\\', pause=PAUSE)

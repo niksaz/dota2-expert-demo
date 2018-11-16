@@ -14,13 +14,11 @@ class DotaEnvironment(Environment):
         self.action_space = (1,)
         self.terminal = False
         server.run_app()
-        runner.make_sure_dota_is_launched()
-        runner.set_timescale()
+        runner.prepare_dota_client()
         runner.start_game()
         time.sleep(20)
 
     def reset(self):
-        runner._focus_dota_window()
         runner.restart_game()
         return server.get_observation()[0]
 
