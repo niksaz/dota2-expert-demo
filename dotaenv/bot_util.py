@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 import numpy as np
-from dotaenv.codes import MOVES_TOTAL, ATTACK_CREEP, ATTACK_HERO, ATTACK_TOWER, STATE_PROJECT
+from dotaenv.codes import MOVE_ACTIONS_TOTAL, ATTACK_CREEP, ATTACK_HERO, ATTACK_TOWER, STATE_PROJECT
 
 
 def action_to_json(action_internal):
@@ -22,10 +22,10 @@ def action_to_json(action_internal):
 
     bot_action = 6
     params = []
-    if 0 <= action_internal < MOVES_TOTAL:
+    if 0 <= action_internal < MOVE_ACTIONS_TOTAL:
         # move
         bot_action = 5
-        params.append(int(action_internal) * (360 / MOVES_TOTAL))
+        params.append(int(action_internal) * (360 / MOVE_ACTIONS_TOTAL))
     elif action_internal == ATTACK_CREEP:
         # attack the nearest creep
         bot_action = 2

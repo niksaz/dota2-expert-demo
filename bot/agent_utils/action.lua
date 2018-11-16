@@ -135,7 +135,7 @@ function Action.execute_action(action_info)
         -- Consider params[1] as an index in the nearby creeps table
         attack_creep(action_params[1])
     elseif action == ACTION_ATTACK_TOWER then
-        -- Attacks the closes enemy tower.
+        -- Attacks the closest enemy tower.
         attack_tower()
     elseif action == ACTION_DO_NOTHING then
         -- do nothing

@@ -15,10 +15,8 @@ sys.path.append('../')
 
 from deepq import ReplayRewardShaper, Estimator, StatePreprocessor, persistence
 from dotaenv import DotaEnvironment
-from dotaenv.codes import ATTACK_TOWER, STATE_DIM
+from dotaenv.codes import STATE_DIM, ACTIONS_TOTAL
 
-STATE_SPACE = STATE_DIM
-ACTION_SPACE = ATTACK_TOWER + 1
 MAX_PRIORITY = 10
 EPS_PRIORITY = 1e-9
 
@@ -47,7 +45,7 @@ class PrioritizedReplayBuffer:
         If the starting or resulting states are incorrect the transition is
         omitted.
         """
-        if len(state) != STATE_SPACE or len(next_state) != STATE_SPACE:
+        if len(state) != STATE_DIM or len(next_state) != STATE_DIM:
             return None
         # Potential based-reward shaping
         reward += (self.discount_factor*self.reward_shaper.get_state_potential(next_state) -
@@ -196,7 +194,7 @@ def deep_q_learning(sess,
         save_dir=experiment_dir)
 
     # The policy we're following
-    policy = make_epsilon_greedy_policy(q_estimator, ACTION_SPACE)
+    policy = make_epsilon_greedy_policy(q_estimator, ACTIONS_TOTAL)
 
     # Populate the replay memory with initial experience
     action_sampler = lambda state: policy(sess, state, epsilons[min(total_t, epsilon_decay_steps-1)])
@@ -223,7 +221,7 @@ def deep_q_learning(sess,
 
             eps = epsilons[min(total_t, epsilon_decay_steps-1)]
 
-            if done or len(state) != STATE_SPACE:
+            if done or len(state) != STATE_DIM:
                 print("Finished episode with reward", episode_reward)
                 summary = tf.Summary(value=[tf.Summary.Value(tag="rewards", simple_value=episode_reward)])
                 reward_writer.add_summary(summary, i_episode)
@@ -294,13 +292,13 @@ def main():
 
     # Create estimators
     q_estimator = Estimator(
-        STATE_SPACE,
-        ACTION_SPACE,
+        STATE_DIM,
+        ACTIONS_TOTAL,
         scope="q",
         summaries_dir=experiment_dir)
     target_estimator = Estimator(
-        STATE_SPACE,
-        ACTION_SPACE,
+        STATE_DIM,
+        ACTIONS_TOTAL,
         scope="target_q")
 
     with tf.Session() as sess:

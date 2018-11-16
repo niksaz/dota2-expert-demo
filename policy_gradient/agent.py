@@ -8,7 +8,7 @@ from sklearn.preprocessing import OneHotEncoder
 from policy_gradient.analyze_model import print_network_weights
 from policy_gradient.network import Network
 from policy_gradient.replay_buffer import ReplayBuffer
-from dotaenv.codes import STATE_DIM, MOVES_TOTAL
+from dotaenv.codes import STATE_DIM, ACTIONS_TOTAL
 from deepq.replay_reward_shaper import ReplayRewardShaper
 from deepq.state_preprocessor import StatePreprocessor
 
@@ -16,7 +16,7 @@ logger = logging.getLogger('DotaRL.PGAgent')
 logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 
 input_shape = STATE_DIM
-output_shape = MOVES_TOTAL
+output_shape = ACTIONS_TOTAL
 
 
 class PGAgent:

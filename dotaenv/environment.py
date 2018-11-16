@@ -4,16 +4,15 @@ from tensorforce.environments import Environment
 
 import dotaenv.bot_server as server
 import dotaenv.dota_runner as runner
-from dotaenv.codes import STATE_DIM, MOVES_TOTAL
+from dotaenv.codes import STATE_DIM, ACTIONS_TOTAL
 
 
 class DotaEnvironment(Environment):
 
     def __init__(self):
-        self.action_space = (MOVES_TOTAL,)
         self.observation_space = (STATE_DIM,)
+        self.action_space = (1,)
         self.terminal = False
-        self.restarts = 0
         server.run_app()
         runner.make_sure_dota_is_launched()
         runner.set_timescale()
@@ -42,4 +41,4 @@ class DotaEnvironment(Environment):
 
     @property
     def actions(self):
-        return dict(type='int', num_actions=self.action_space[0])
+        return dict(type='int', num_actions=ACTIONS_TOTAL)
