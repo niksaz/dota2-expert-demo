@@ -85,7 +85,7 @@ function get_self_info()
     self_info[2] = self_position[2]
     for dir=0,(Resolver.total_dirs-1) do
         local dir_vector = Resolver.delta_vector_for_dir(dir)
-        self_position[3+dir] = Resolver.can_move_by_delta(self_position, dir_vector) and 1 or 0
+        self_info[3+dir] = Resolver.can_move_by_delta(self_position, dir_vector) and 1 or 0
     end
 --        bot:GetFacing(),
 --        bot:GetAttackDamage(),
