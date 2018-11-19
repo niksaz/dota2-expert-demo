@@ -83,14 +83,14 @@ function get_self_info()
     local self_info = {}
     self_info[1] = self_position[1]
     self_info[2] = self_position[2]
+    self_info[3] = bot:GetHealth() / bot:GetMaxHealth()
     for dir=0,(Resolver.total_dirs-1) do
         local dir_vector = Resolver.delta_vector_for_dir(dir)
-        self_info[3+dir] = Resolver.can_move_by_delta(self_position, dir_vector) and 1 or 0
+        self_info[4+dir] = Resolver.can_move_by_delta(self_position, dir_vector) and 1 or 0
     end
 --        bot:GetFacing(),
 --        bot:GetAttackDamage(),
 --        bot:GetLevel(),
---        bot:GetHealth(),
 --        bot:GetMana(),
 --        ability1_dmg,
 --        ability2_dmg,
@@ -168,7 +168,7 @@ function Observation.is_done()
     if GetGameState() == GAME_STATE_POST_GAME or
             GetHeroKills(bot_player_id) > 0 or
             GetHeroDeaths(bot_player_id) > 0 or
-            DotaTime() > 600 then
+            DotaTime() > 300 then
         _end = true
         print('Bot: the game has ended.')
     end

@@ -112,7 +112,6 @@ local last_attack_time = bot:GetLastAttackTime()
 function Reward.get_reward(wrong_action)
 --    local my_health = get_my_health()
 --    local my_kills = get_my_kills()
---    local my_deaths = get_my_deaths()
 --    local enemy_health = get_enemy_health()
 --    local enemy_tower_health = get_enemy_tower_health()
 --    local ally_tower_health = get_ally_tower_health()
@@ -145,10 +144,13 @@ function Reward.get_reward(wrong_action)
         reward = reward - 0.1
     end
 
+    local deaths = get_my_deaths()
+    reward = reward - (deaths - last_deaths) * 100
+    last_deaths = deaths
+
 --    last_enemy_tower_health = enemy_tower_health
 --    last_ally_tower_health = ally_tower_health
 --    last_kills = my_kills
---    last_deaths = my_deaths
 --    last_hits = hits
 --    last_my_health = my_health
 --    last_enemy_health = enemy_health
