@@ -34,6 +34,8 @@ class Estimator:
         self.Y = tf.placeholder(shape=[None], dtype=tf.float32, name="Y")
         # Selected action index
         self.action_ind = tf.placeholder(shape=[None], dtype=tf.int32, name="actions")
+        # Gradients' importance weights
+        self.weights = tf.placeholder(shape=[None], dtype=tf.float32, name="weights")
 
         layer_shape = 20
 
@@ -59,8 +61,12 @@ class Estimator:
             momentum=0.95,
             decay=0.0,
             epsilon=0.01,)
-        self.train_op = self.optimizer.minimize(self.loss,
-                                                global_step=tf.train.get_global_step())
+
+        grads_and_vars = self.optimizer.compute_gradients(self.loss)
+        weighted_grads_and_vars = [(g * w, v) for (g, v), w in zip(grads_and_vars, self.weights)]
+
+        self.train_op = self.optimizer.apply_gradients(weighted_grads_and_vars,
+                                                       global_step=tf.train.get_global_step())
 
         # Summaries for Tensorboard
         self.summaries = tf.summary.merge([
@@ -73,8 +79,8 @@ class Estimator:
         feed_dict = {self.X: X}
         return sess.run(self.predictions, feed_dict=feed_dict)
 
-    def update(self, sess, X, actions, targets):
-        feed_dict = {self.X: X, self.Y: targets, self.action_ind: actions}
+    def update(self, sess, X, actions, targets, weights):
+        feed_dict = {self.X: X, self.Y: targets, self.action_ind: actions, self.weights: weights}
         summaries, global_step, predictions, _ = sess.run(
             [self.summaries, tf.train.get_global_step(), self.action_predictions, self.train_op],
             feed_dict)

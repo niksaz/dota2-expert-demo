@@ -17,7 +17,7 @@ from deepq import ReplayRewardShaper, Estimator, StatePreprocessor, persistence
 from dotaenv import DotaEnvironment
 from dotaenv.codes import STATE_DIM, ACTIONS_TOTAL
 
-MAX_PRIORITY = 10
+MAX_PRIORITY = 1
 EPS_PRIORITY = 1e-9
 
 Transition = namedlist(
@@ -29,15 +29,23 @@ class PrioritizedReplayBuffer:
     """Reference paper: https://arxiv.org/pdf/1511.05952.pdf.
     """
 
-    def __init__(self, replay_memory_size, alpha, beta0, reward_shaper, discount_factor, save_dir):
+    def __init__(self,
+                 replay_memory_size,
+                 total_steps,
+                 reward_shaper,
+                 discount_factor,
+                 save_dir,
+                 alpha=0.6,
+                 beta0=0.4):
         """Initializes the replay buffer and caps the memory size to replay_memory_size.
         """
         self.replay_memory = deque(maxlen=replay_memory_size)
-        self.alpha = alpha
-        self.beta0 = beta0
+        self.total_steps = total_steps
         self.reward_shaper = reward_shaper
         self.discount_factor = discount_factor
         self.dump_path = os.path.join(save_dir, 'replay_buffer.pickle')
+        self.alpha = alpha
+        self.beta0 = beta0
 
     def push(self, state, action, next_state, done, reward):
         """ Pushes the transition into memory with MAX_PRIORITY.
@@ -53,19 +61,27 @@ class PrioritizedReplayBuffer:
         transition = Transition(state, action, next_state, done, reward, MAX_PRIORITY)
         self.replay_memory.append(transition)
 
-    def sample(self, batch_size):
+    def sample(self, batch_size, step):
         """Samples the batch according to priorities.
 
-        Returns a tuple of (transitions, indices).
+        Returns a tuple of (samples, weights, idx).
         """
-        buffer_size = len(self.replay_memory)
-        p = np.zeros(buffer_size)
-        for i in range(buffer_size):
+        N = len(self.replay_memory)
+        # Transition sampling probabilities.
+        p = np.zeros(N)
+        for i in range(N):
             p[i] = self.replay_memory[i].priority ** self.alpha
         p /= p.sum()
-        idx = np.random.choice(buffer_size, batch_size, replace=False, p=p).tolist()
+        # Indices of samples.
+        idx = np.random.choice(N, batch_size, replace=False, p=p).tolist()
         samples = [self.replay_memory[id] for id in idx]
-        return samples, idx
+        # Linearly annealing importance-sampling exponent.
+        beta = self.beta0 + (1 - self.beta0) * (step / self.total_steps)
+        # Importance-sampling weights.
+        weights = (N * p[idx]) ** (-beta)
+        # Normalize weights.
+        weights = weights / np.max(weights)
+        return samples, weights, idx
 
     def update_priorities(self, idx, priorities):
         for index, priority in zip(idx, priorities):
@@ -186,9 +202,8 @@ def deep_q_learning(sess,
     reward_shaper.load()
 
     replay_buffer = PrioritizedReplayBuffer(
-        replay_memory_size,
-        alpha=0.6,
-        beta0=0.4,
+        replay_memory_size=replay_memory_size,
+        total_steps=num_steps,
         reward_shaper=reward_shaper,
         discount_factor=discount_factor,
         save_dir=experiment_dir)
@@ -250,7 +265,7 @@ def deep_q_learning(sess,
 
             if total_t % update_q_values_every == 0:
                 # Sample a minibatch from the replay memory
-                samples, idx = replay_buffer.sample(batch_size)
+                samples, weights, idx = replay_buffer.sample(batch_size, total_t)
                 states, actions, next_states, dones, rewards, _ = map(np.array, zip(*samples))
 
                 not_dones = np.invert(dones).astype(np.float32)
@@ -263,7 +278,7 @@ def deep_q_learning(sess,
                     discount_factor * not_dones * next_q_values_target[np.arange(batch_size), best_actions])
 
                 # Perform gradient descent update
-                predictions = q_estimator.update(sess, states, actions, targets)
+                predictions = q_estimator.update(sess, states, actions, targets, weights)
 
                 # Update transition priorities
                 priors = np.abs(predictions - targets) + EPS_PRIORITY
