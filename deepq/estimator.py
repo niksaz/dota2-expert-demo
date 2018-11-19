@@ -7,6 +7,7 @@ import tensorflow as tf
 class Estimator:
     """Q-Value estimation neural network.
 
+    Employs Dueling Network Architecture (https://arxiv.org/pdf/1511.06581.pdf).
     Used for both Q-Value estimation and the target network.
     """
 
@@ -42,9 +43,13 @@ class Estimator:
         # Network
         fc1 = tf.layers.dense(inputs=self.X, units=layer_shape, activation=tf.nn.relu)
         fc2 = tf.layers.dense(inputs=fc1, units=layer_shape, activation=tf.nn.relu)
-        fc3 = tf.layers.dense(inputs=fc2, units=action_space, activation=None)
 
-        self.predictions = fc3
+        # State values
+        fc3s = tf.layers.dense(inputs=fc2, units=1, activation=None)
+        # Advantage values
+        fc3a = tf.layers.dense(inputs=fc2, units=action_space, activation=None)
+
+        self.predictions = fc3s + (fc3a - tf.reduce_mean(fc3a, reduction_indices=[1, ], keep_dims=True))
 
         # Get the predictions for the chosen actions only
         batch_size = tf.shape(self.X)[0]
