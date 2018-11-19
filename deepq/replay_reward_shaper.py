@@ -4,7 +4,7 @@ import os
 import pickle
 import numpy as np
 
-from deepq import StatePreprocessor
+from deepq.state_preprocessor import StatePreprocessor
 from dotaenv.codes import SHAPER_STATE_PROJECT
 
 EPS = 1e-1
