@@ -53,7 +53,7 @@ class Estimator:
 
         # Calculate the loss
         self.losses = tf.squared_difference(self.Y, self.action_predictions)
-        self.loss = tf.reduce_mean(self.losses)
+        self.loss = tf.losses.compute_weighted_loss(self.losses, self.weights)
 
         # Optimizer parameters are taken from DQN paper (V. Mnih 2015)
         self.optimizer = tf.train.RMSPropOptimizer(
@@ -61,12 +61,8 @@ class Estimator:
             momentum=0.95,
             decay=0.0,
             epsilon=0.01,)
-
-        grads_and_vars = self.optimizer.compute_gradients(self.loss)
-        weighted_grads_and_vars = [(g * w, v) for (g, v), w in zip(grads_and_vars, self.weights)]
-
-        self.train_op = self.optimizer.apply_gradients(weighted_grads_and_vars,
-                                                       global_step=tf.train.get_global_step())
+        self.train_op = self.optimizer.minimize(self.loss,
+                                                global_step=tf.train.get_global_step())
 
         # Summaries for Tensorboard
         self.summaries = tf.summary.merge([
