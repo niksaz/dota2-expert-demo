@@ -62,7 +62,7 @@ def populate_replay_buffer(replay_buffer, action_sampler, env):
     state = StatePreprocessor.process(state)
     done = False
     for t in itertools.count():
-        if done:
+        if done or len(state) != STATE_DIM:
             break
         action_probs = action_sampler(state)
         action = np.random.choice(np.arange(len(action_probs)), p=action_probs)

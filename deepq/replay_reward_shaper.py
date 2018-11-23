@@ -8,7 +8,7 @@ from deepq.state_preprocessor import StatePreprocessor
 from dotaenv.codes import SHAPER_STATE_PROJECT
 
 EPS = 1e-1
-K=10
+K = 100
 
 
 class ReplayRewardShaper:
@@ -45,6 +45,10 @@ class ReplayRewardShaper:
         return demo
 
     def get_state_potential(self, state):
+        """ Returns the state potential that is a float from [0; K).
+
+        It represents the completion of the demo episode.
+        """
         if len(state) < len(SHAPER_STATE_PROJECT):
             return 0.0
         state = state[SHAPER_STATE_PROJECT]
@@ -52,7 +56,7 @@ class ReplayRewardShaper:
             for i in reversed(range(len(demo))):
                 diff = np.linalg.norm(demo[i] - state)
                 if diff < EPS:
-                    return K*i
+                    return K*(i/len(demo))
         return 0
 
 

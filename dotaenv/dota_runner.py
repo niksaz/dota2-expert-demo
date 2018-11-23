@@ -30,11 +30,12 @@ def start_game():
     # Start
     gui.click(x=RIGHT_BOT_BUTTON_X, y=RIGHT_BOT_BUTTON_Y, duration=DURATION, pause=PAUSE)
     # Create lobby
-    gui.click(x=858, y=418, pause=PAUSE)
+    gui.click(x=858, y=418, duration=DURATION, pause=PAUSE)
     # Join coaches
-    gui.click(x=807, y=484, pause=PAUSE)
+    gui.click(x=807, y=484, duration=DURATION, pause=PAUSE)
     # Start game
-    gui.click(x=RIGHT_BOT_BUTTON_X, y=RIGHT_BOT_BUTTON_Y, pause=PAUSE)
+    gui.click(x=RIGHT_BOT_BUTTON_X, y=RIGHT_BOT_BUTTON_Y, duration=DURATION, pause=PAUSE)
+    time.sleep(20)
 
 
 def restart_game():

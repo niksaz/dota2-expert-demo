@@ -16,7 +16,6 @@ class DotaEnvironment(Environment):
         server.run_app()
         runner.prepare_dota_client()
         runner.start_game()
-        time.sleep(20)
 
     def reset(self):
         runner.restart_game()
