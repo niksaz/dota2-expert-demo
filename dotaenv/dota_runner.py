@@ -11,22 +11,40 @@ DURATION = 0.5
 PAUSE = 1
 
 
+def prepare_steam_client():
+    if _is_steam_launched():
+        _focus_steam_window()
+    else:
+        # "Search your computer" Ubuntu function
+        gui.click(x=32, y=56)
+        gui.typewrite('steam', interval=INTERVAL)
+
+        # Run the first option
+        gui.press('enter', pause=PAUSE)
+        time.sleep(30)
+
+
 def prepare_dota_client():
     if _is_dota_launched():
         _focus_dota_window()
     else:
-        _focus_steam_window()
-
         # Search for Dota 2 in the library
-        gui.click(x=118, y=108)
+        gui.click(x=150, y=120)
         gui.typewrite('dota', interval=INTERVAL)
 
         # Press play
-        gui.click(x=400, y=230, pause=30)
-    _enable_cheats()
+        gui.click(x=416, y=236, pause=30)
+        enable_cheats()
+        start_game()
+        time.sleep(30)
 
 
 def start_game():
+    # Leave the game if there is one
+    gui.click(x=832, y=786, duration=DURATION, pause=PAUSE)
+    # Confirm it
+    gui.click(x=580, y=571, pause=4*PAUSE)
+
     # Start
     gui.click(x=RIGHT_BOT_BUTTON_X, y=RIGHT_BOT_BUTTON_Y, duration=DURATION, pause=PAUSE)
     # Create lobby
@@ -35,10 +53,12 @@ def start_game():
     gui.click(x=807, y=484, duration=DURATION, pause=PAUSE)
     # Start game
     gui.click(x=RIGHT_BOT_BUTTON_X, y=RIGHT_BOT_BUTTON_Y, duration=DURATION, pause=PAUSE)
-    time.sleep(20)
 
 
 def restart_game():
+    prepare_steam_client()
+    prepare_dota_client()
+
     # Slow down the time and restart the game
     gui.press('\\', pause=PAUSE)
     gui.typewrite('host_timescale 6', interval=INTERVAL)
@@ -57,7 +77,21 @@ def restart_game():
     gui.press('\\', pause=PAUSE)
 
 
-def close_game():
+def close_steam_client():
+    if not _is_steam_launched():
+        return
+    _focus_steam_window()
+
+    # Click on the steam menu option
+    gui.click(x=101, y=51, pause=PAUSE)
+    # Pick the exit option
+    gui.click(x=101, y=199, pause=PAUSE)
+    time.sleep(30)
+
+
+def close_dota_client():
+    if not _is_dota_launched():
+        return
     _focus_dota_window()
 
     # Bring up the menu
@@ -69,24 +103,23 @@ def close_game():
     # Exit
     gui.click(x=1022, y=256, pause=2*PAUSE)
     # Confirm it and wait for complete closure
-    gui.click(x=580, y=568, pause=15)
+    gui.click(x=580, y=568, pause=PAUSE)
+    time.sleep(30)
 
 
-def _run_cmd(cmd):
-    ps = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE)
-    output = ps.stdout.read()
-    ps.stdout.close()
-    ps.wait()
-    return output.decode('utf-8')
+def enable_cheats():
+    gui.press('\\', pause=PAUSE)
+    gui.typewrite('sv_cheats 1', interval=INTERVAL)
+    gui.press('enter', pause=PAUSE)
+    gui.press('\\', pause=PAUSE)
+
+
+def _is_steam_launched():
+    return _run_cmd('ps -ef | grep steam').find('steam.sh') != -1
 
 
 def _is_dota_launched():
     return _run_cmd('ps -ef | grep dota').find('dota 2 beta') != -1
-
-
-def _focus_dota_window():
-    _run_cmd('wmctrl -a "Dota 2"')
-    time.sleep(DURATION)
 
 
 def _focus_steam_window():
@@ -99,8 +132,14 @@ def _focus_steam_window():
     time.sleep(DURATION)
 
 
-def _enable_cheats():
-    gui.press('\\', pause=PAUSE)
-    gui.typewrite('sv_cheats 1', interval=INTERVAL)
-    gui.press('enter', pause=PAUSE)
-    gui.press('\\', pause=PAUSE)
+def _focus_dota_window():
+    _run_cmd('wmctrl -a "Dota 2"')
+    time.sleep(DURATION)
+
+
+def _run_cmd(cmd):
+    ps = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE)
+    output = ps.stdout.read()
+    ps.stdout.close()
+    ps.wait()
+    return output.decode('utf-8')
