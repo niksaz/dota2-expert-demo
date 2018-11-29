@@ -8,7 +8,7 @@ from deepq.state_preprocessor import StatePreprocessor
 from dotaenv.codes import SHAPER_STATE_PROJECT
 
 EPS = 1e-1
-K = 100
+K = 1000
 
 
 class ReplayRewardShaper:

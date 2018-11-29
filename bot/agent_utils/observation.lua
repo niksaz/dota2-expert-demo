@@ -40,19 +40,18 @@ end
 
 -- Obtain towers' info.
 function get_towers_info()
-    local enemy_tower = get_enemy_tower()
-    local ally_tower = get_ally_tower()
-    local enemy_tower_health = 0
-    if enemy_tower ~= nil then
-        enemy_tower_health = enemy_tower:GetHealth()
+    local enemy_towers = bot:GetNearbyTowers(NEARBY_RADIUS, true)
+--    local ally_tower = get_ally_tower()
+    local enemy_tower_dst = 1
+    if #enemy_towers > 0 then
+        enemy_tower_dst = GetUnitToUnitDistance(bot, enemy_towers[1]) / NEARBY_RADIUS
     end
-    local ally_tower_health = 0
-    if ally_tower ~= nil then
-        ally_tower_health = ally_tower:GetHealth()
-    end
+--    local ally_tower_health = 0
+--    if ally_tower ~= nil then
+--        ally_tower_health = ally_tower:GetHealth()
+--    end
     return {
-        enemy_tower_health,
-        ally_tower_health
+        enemy_tower_dst,
     }
 end
 
@@ -83,11 +82,12 @@ function get_self_info()
     local self_info = {}
     self_info[1] = self_position[1]
     self_info[2] = self_position[2]
-    self_info[3] = bot:GetHealth() / bot:GetMaxHealth()
     for dir=0,(Resolver.total_dirs-1) do
         local dir_vector = Resolver.delta_vector_for_dir(dir)
-        self_info[4+dir] = Resolver.can_move_by_delta(self_position, dir_vector) and 1 or 0
+        self_info[3+dir] = Resolver.can_move_by_delta(self_position, dir_vector) and 1 or 0
     end
+    self_info[3+Resolver.total_dirs] = bot:GetHealth() / bot:GetMaxHealth()
+
 --        bot:GetFacing(),
 --        bot:GetAttackDamage(),
 --        bot:GetLevel(),
@@ -102,20 +102,19 @@ end
 
 -- Obtain enemy hero info.
 function get_enemy_hero_info()
-    local enemy_hero_info = { 0, 0, 0, 0, 0, 0, 0 }
+    local enemy_hero_info = { 1 } -- , 0, 0, 0, 0, 0 }
 
     local enemy_heroes_list = bot:GetNearbyHeroes(NEARBY_RADIUS, true, BOT_MODE_NONE)
     if #enemy_heroes_list > 0 then
         local enemy = enemy_heroes_list[1]
         local enemy_position = enemy:GetLocation()
         enemy_hero_info = {
-            enemy_position[1],
-            enemy_position[2],
-            enemy:GetAttackDamage(),
-            enemy:GetLevel(),
-            enemy:GetHealth(),
-            enemy:GetMana(),
-            enemy:GetFacing(),
+            GetUnitToUnitDistance(bot, enemy) / NEARBY_RADIUS
+--            enemy:GetAttackDamage(),
+--            enemy:GetLevel(),
+--            enemy:GetHealth(),
+--            enemy:GetMana(),
+--            enemy:GetFacing(),
         }
     end
 
@@ -126,23 +125,30 @@ end
 -- @param creeps to retrieve info from
 --
 function get_creeps_info(creeps)
-    local creeps_info = {}
-    for _, creep in pairs(creeps) do
-        local position = creep:GetLocation()
-        table.insert(creeps_info, {
-            creep:GetHealth(),
-            position[1],
-            position[2]
-        })
+    local creep_dst = 1
+    if #creeps > 0 then
+        local creep = creeps[1]
+        creep_dst = GetUnitToUnitDistance(bot, creep) / NEARBY_RADIUS
     end
+--    local creeps_info = {}
+--    for _, creep in pairs(creeps) do
+--        local position = creep:GetLocation()
+--        table.insert(creeps_info, {
+--            GetUnitToUnitDistance(bot, creep) / NEARBY_RADIUS
+--        })
+--    end
 
     -- if creeps_info is empty:
-    local creep_zero_padding = { 0, 0, 0 }
-    if #creeps_info == 0 then
-        table.insert(creeps_info, creep_zero_padding)
-    end
+--    local creep_zero_padding = { 0, 0, 0 }
+--    if #creeps_info == 0 then
+--        table.insert(creeps_info, {
+--            1
+--        })
+--    end
 
-    return creeps_info
+    return {
+        creep_dst
+    }
 end
 
 -- Get all observations.
@@ -152,11 +158,11 @@ function Observation.get_observation()
 
     local observation = {
         ['self_info'] = get_self_info(),
-        ['enemy_info'] = get_enemy_hero_info(),
         ['enemy_creeps_info'] = enemy_creeps,
-        ['ally_creeps_info'] = ally_creeps,
+        ['enemy_info'] = get_enemy_hero_info(),
         ['tower_info'] = get_towers_info(),
-        ['damage_info'] = get_damage_info()
+--        ['ally_creeps_info'] = ally_creeps,
+--        ['damage_info'] = get_damage_info()
     }
 
     return observation

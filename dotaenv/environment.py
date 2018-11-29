@@ -13,7 +13,7 @@ class DotaEnvironment(Environment):
     def __init__(self):
         self.observation_space = (STATE_DIM,)
         self.action_space = (1,)
-        self.episodes_experienced = RESTART_AFTER_EPISODES
+        self.episodes_experienced = 0
         server.run_app()
 
     def reset(self):

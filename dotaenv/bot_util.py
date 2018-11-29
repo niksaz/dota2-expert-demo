@@ -85,41 +85,44 @@ def vectorize_observation(observation):
     # enemy:GetMana()
     # enemy:GetFacing()
     # 7 values
+    result.extend(observation['enemy_creeps_info'])
+
     result.extend(observation['enemy_info'])
+
+    result.extend(observation['tower_info'])
 
     # info about 10 nearby enemy creeps
     # creep:GetHealth()
     # creep:GetLocation[1]
     # creep:GetLocation[2]
     # 3x10=30 values
-    creeps = observation['enemy_creeps_info']
-    for i in range(10):
-        if i < len(creeps):
-            result.extend(creeps[i])
-        else:
-            result.extend([0, 0, 0])
+    # creeps = observation['enemy_creeps_info']
+    # for i in range(10):
+    #     if i < len(creeps):
+    #         result.extend(creeps[i])
+    #     else:
+    #         result.extend([0, 0, 0])
 
     # info about 10 nearby allied creeps
     # creep:GetHealth()
     # creep:GetLocation[1]
     # creep:GetLocation[2]
     # 3x10=30 values
-    creeps = observation['ally_creeps_info']
-    for i in range(10):
-        if i < len(creeps):
-            result.extend(creeps[i])
-        else:
-            result.extend([0, 0, 0])
+    # creeps = observation['ally_creeps_info']
+    # for i in range(10):
+    #     if i < len(creeps):
+    #         result.extend(creeps[i])
+    #     else:
+    #         result.extend([0, 0, 0])
 
     # enemy_tower: GetHealth()
     # ally_tower: GetHealth()
     # 2 values
-    result.extend(observation['tower_info'])
     # bot: TimeSinceDamagedByAnyHero()
     # bot: TimeSinceDamagedByCreep()
     # bot: TimeSinceDamagedByTower()
     # 3 values
-    result.extend(observation['damage_info'])
+    # result.extend(observation['damage_info'])
 
     # taking values that are relevant for the current action space
     return np.array(result)[STATE_PROJECT]
