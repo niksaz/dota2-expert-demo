@@ -1,8 +1,9 @@
 from enum import IntEnum
-from threading import Event, Thread, RLock
+from threading import Condition, Thread
 from flask import Flask
 from flask import request
 from flask import jsonify
+from flask import abort
 import logging
 
 from dotaenv.bot_util import message_to_observation, action_to_json
@@ -27,76 +28,95 @@ def run_app(port=5000):
 
 
 class FsmState(IntEnum):
-    WHAT_NEXT = 0
+    IDLE = 0
     ACTION_RECEIVED = 1
     SEND_OBSERVATION = 2
 
 
-lock = RLock()
-observation_received = Event()
-observation = None
-current_action = None
-current_fsm_state = FsmState.WHAT_NEXT
+changed_condition = Condition()
+observation = None  # Guarded by changed_condition
+current_action = None  # Guarded by changed_condition
+is_reset = True  # Guarded by changed_condition
 
 
-def step(action):
+def reset():
     """
-    Execute action and receive observation from the bot.
-
-    :return: tuple (observation, reward, is_done)
+    Returns the server to the initial state and notifies all waiting for an action threads.
     """
-    global current_fsm_state, current_action, observation
-
-    lock.acquire()
-    current_fsm_state = FsmState.ACTION_RECEIVED
-    current_action = action_to_json(action)
-    lock.release()
-
-    observation_received.wait(timeout=60)
-    result = observation
+    global observation, current_action, is_reset
+    changed_condition.acquire()
     observation = None
-    observation_received.clear()
-
-    return message_to_observation(result)
+    current_action = None
+    is_reset = True
+    changed_condition.notify()
+    changed_condition.release()
 
 
 def get_observation():
     """
-    Get observation from the bot.
+    Gets an observation from the dota thread.
 
     :return: tuple (observation, reward, is_done)
     """
-    global current_fsm_state, observation
+    global observation
 
-    lock.acquire()
-    current_fsm_state = FsmState.SEND_OBSERVATION
-    lock.release()
+    changed_condition.acquire()
+    while observation is None:
+        # wait for the dota thread to produce an observation
+        changed_condition.wait()
 
-    observation_received.wait(timeout=60)
     result = observation
     observation = None
-    observation_received.clear()
+    changed_condition.notify()
+    changed_condition.release()
 
     return message_to_observation(result)
 
 
-def bot_response():
-    global current_action, current_fsm_state
-    lock.acquire()
-    if current_action is None:
-        current_fsm_state = FsmState.SEND_OBSERVATION
-    else: 
-        current_fsm_state = FsmState.ACTION_RECEIVED
-    response = jsonify({'fsm_state': current_fsm_state, 'action': current_action})
-    current_action = None
-    lock.release()
-    return response
+def step(action):
+    """
+    Executes the action and receives an observation from the bot.
+
+    :return: tuple (observation, reward, is_done)
+    """
+    global current_action
+
+    changed_condition.acquire()
+    while current_action is not None:
+        # wait for the dota thread to consume the action
+        changed_condition.wait()
+
+    current_action = action_to_json(action)
+    changed_condition.notify()
+    changed_condition.release()
+
+    return get_observation()
 
 
 @app.route('/observation', methods=['POST'])
 def process_observation():
-    global observation, current_fsm_state
+    global observation, current_action, is_reset
+
+    changed_condition.acquire()
+    is_reset = False
+    while observation is not None:
+        # wait for the agent to consume the observation
+        changed_condition.wait()
+        if is_reset:
+            abort(404)
+
     observation = request.get_json()['content']
-    observation_received.set()
-    response = bot_response()
+    changed_condition.notify()
+
+    while current_action is None:
+        # wait for the agent to produce an action
+        changed_condition.wait()
+        if is_reset:
+            abort(404)
+
+    response = jsonify({'fsm_state': FsmState.ACTION_RECEIVED, 'action': current_action})
+    current_action = None
+    changed_condition.notify()
+    changed_condition.release()
+
     return response

@@ -171,6 +171,8 @@ def deep_q_learning(sess,
             # Take a step
             action_probs = policy(sess, state, eps)
             action = np.random.choice(np.arange(len(action_probs)), p=action_probs)
+            print("state: {state}, action: {action}.".format(state=state, action=action))
+
             next_state, reward, done = env.execute(action=action)
             next_state = StatePreprocessor.process(next_state)
 
@@ -242,10 +244,10 @@ def main():
             q_estimator=q_estimator,
             target_estimator=target_estimator,
             experiment_dir=experiment_dir,
-            num_steps=200000,
+            num_steps=500000,
             replay_memory_size=10000,
             epsilon_decay_steps=100000,
-            epsilon_start=1.0,
+            epsilon_start=0.5,
             epsilon_end=0.1,
             update_target_estimator_every=1000,
             update_q_values_every=4,

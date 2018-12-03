@@ -7,11 +7,10 @@ local Action = require(GetScriptDirectory() .. '/agent_utils/action')
 local current_action
 local state_num = 0
 
--- Bot to server comunication FSM.
-local WHAT_NEXT = 0
+-- Bot communication automaton.
+local IDLE = 0
 local ACTION_RECEIVED = 1
 local SEND_OBSERVATION = 2
-local DO_NOTHING = 3
 local fsm_state = SEND_OBSERVATION
 
 local wrong_action = 0
@@ -92,13 +91,13 @@ function Think()
     --print(DotaTime())
     if fsm_state == SEND_OBSERVATION then
         print('Sending')
-        fsm_state = DO_NOTHING
+        fsm_state = IDLE
         send_observation_message()
         last_time_sent = GameTime()
     elseif fsm_state == ACTION_RECEIVED then
         fsm_state = SEND_OBSERVATION
         execute_action(current_action)
-    elseif fsm_state == DO_NOTHING then
+    elseif fsm_state == IDLE then
         -- Do nothing
     end
 end

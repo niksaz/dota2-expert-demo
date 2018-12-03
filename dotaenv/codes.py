@@ -1,7 +1,7 @@
 # Author: Mikita Sazanovich
 
 # Taking first 11 dimensions
-STATE_PROJECT = range(14)
+STATE_PROJECT = range(10)
 SHAPER_STATE_PROJECT = range(2)
 STATE_DIM = len(STATE_PROJECT)
 
@@ -14,4 +14,4 @@ ATTACK_HERO = ATTACK_CREEP + 1
 # Action to attack the enemy middle tower
 ATTACK_TOWER = ATTACK_HERO + 1
 
-ACTIONS_TOTAL = ATTACK_TOWER + 1
+ACTIONS_TOTAL = MOVE_ACTIONS_TOTAL

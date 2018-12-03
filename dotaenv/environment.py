@@ -17,12 +17,14 @@ class DotaEnvironment(Environment):
         server.run_app()
 
     def reset(self):
+        server.reset()
         self.episodes_experienced += 1
         if self.episodes_experienced > RESTART_AFTER_EPISODES:
             self.episodes_experienced = 0
             self.close()
         runner.restart_game()
-        return server.get_observation()[0]
+        observation, reward, done = server.get_observation()
+        return observation
 
     def execute(self, action):
         state, reward, terminal = server.step(action=action)
