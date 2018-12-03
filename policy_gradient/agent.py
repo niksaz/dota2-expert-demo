@@ -127,7 +127,7 @@ class PGAgent:
             states.append(state)
             action = self.get_action(state=state, eps=eps)
             actions.append(action)
-            state, terminal_action, reward = self.env.execute(action=action)
+            state, reward, terminal_action, _ = self.env.step(action=action)
             state = StatePreprocessor.process(state)
             next_states.append(state)
             rewards.append(reward)

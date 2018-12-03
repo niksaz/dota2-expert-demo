@@ -67,7 +67,7 @@ def populate_replay_buffer(replay_buffer, action_sampler, env):
         action_probs = action_sampler(state)
         action = np.random.choice(np.arange(len(action_probs)), p=action_probs)
         print("Step {step} state: {state}, action: {action}.".format(step=t, state=state, action=action))
-        next_state, reward, done = env.execute(action=action)
+        next_state, reward, done, _ = env.step(action=action)
         next_state = StatePreprocessor.process(next_state)
         replay_buffer.push(state, action, next_state, done, reward)
         state = next_state
@@ -173,7 +173,7 @@ def deep_q_learning(sess,
             action = np.random.choice(np.arange(len(action_probs)), p=action_probs)
             print("state: {state}, action: {action}.".format(state=state, action=action))
 
-            next_state, reward, done = env.execute(action=action)
+            next_state, reward, done, _ = env.step(action=action)
             next_state = StatePreprocessor.process(next_state)
 
             episode_reward += reward * multiplier
