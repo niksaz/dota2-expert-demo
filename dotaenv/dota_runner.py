@@ -27,13 +27,13 @@ def make_sure_dota_is_launched():
 
 def start_game():
     # start
-    gui.click(x=974, y=668, pause=0.5)
+    gui.click(x=1200, y=810, pause=0.5)
     # create lobby
-    gui.click(x=892, y=353, pause=2)
+    gui.click(x=1120, y=300, pause=2)
     # join coaches
-    gui.click(x=899, y=408, pause=2)
+    gui.click(x=1055, y=370, pause=2)
     # start game
-    gui.click(x=974, y=668, pause=1)
+    gui.click(x=1200, y=810, pause=1)
 
 
 def set_timescale():
@@ -52,7 +52,8 @@ def restart_game():
     gui.typewrite('restart', interval=0.05, pause=0.3)
     gui.press('enter', pause=0.1)
     gui.press('\\', pause=0.1)
-    time.sleep(10)
+    time.sleep(15)
+
     # Press keys to speed up Dota 2 launching
     gui.press('esc', pause=1)
     gui.press('esc', pause=1)
@@ -60,20 +61,26 @@ def restart_game():
     gui.press('esc', pause=1)
     gui.press('esc', pause=1)
 
+    # Start the game timer right away
+    gui.press('\\', pause=0.1)
+    gui.typewrite('dota_dev forcegamestart', interval=0.05, pause=0.3)
+    gui.press('enter', pause=0.1)
+    gui.press('\\', pause=0.1)
+
 
 def close_game():
     _bring_into_focus()
 
     # bring up the menu
-    gui.click(x=373, y=223, pause=1)
+    gui.click(x=102, y=68, pause=1)
     # disconnect
-    gui.click(x=980, y=671, pause=1)
+    gui.click(x=1190, y=813, pause=1)
     # confirm it
-    gui.click(x=680, y=488, pause=2)
+    gui.click(x=645, y=518, pause=2)
     # exit
-    gui.click(x=1068, y=228, pause=1)
+    gui.click(x=1336, y=72, pause=1)
     # confirm it and wait for complete closure
-    gui.click(x=680, y=475, pause=15)
+    gui.click(x=642, y=490, pause=15)
 
 
 def _bring_into_focus():
