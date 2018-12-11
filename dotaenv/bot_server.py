@@ -48,7 +48,7 @@ def reset():
     observation = None
     current_action = None
     is_reset = True
-    changed_condition.notify()
+    changed_condition.notify_all()
     changed_condition.release()
 
 
@@ -59,15 +59,16 @@ def get_observation():
     :return: tuple (observation, reward, is_done)
     """
     global observation
-
     changed_condition.acquire()
     while observation is None:
         # wait for the dota thread to produce an observation
-        changed_condition.wait()
+        timeout_satisfied = changed_condition.wait(timeout=30)
+        if not timeout_satisfied:
+            break
 
     result = observation
     observation = None
-    changed_condition.notify()
+    changed_condition.notify_all()
     changed_condition.release()
 
     return message_to_observation(result)
@@ -84,10 +85,12 @@ def step(action):
     changed_condition.acquire()
     while current_action is not None:
         # wait for the dota thread to consume the action
-        changed_condition.wait()
+        timeout_satisfied = changed_condition.wait(timeout=30)
+        if not timeout_satisfied:
+            break
 
     current_action = action_to_json(action)
-    changed_condition.notify()
+    changed_condition.notify_all()
     changed_condition.release()
 
     return get_observation()
@@ -103,20 +106,22 @@ def process_observation():
         # wait for the agent to consume the observation
         changed_condition.wait()
         if is_reset:
+            changed_condition.release()
             abort(404)
 
     observation = request.get_json()['content']
-    changed_condition.notify()
+    changed_condition.notify_all()
 
     while current_action is None:
         # wait for the agent to produce an action
         changed_condition.wait()
         if is_reset:
+            changed_condition.release()
             abort(404)
 
     response = jsonify({'fsm_state': FsmState.ACTION_RECEIVED, 'action': current_action})
     current_action = None
-    changed_condition.notify()
+    changed_condition.notify_all()
     changed_condition.release()
 
     return response

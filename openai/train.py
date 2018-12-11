@@ -6,13 +6,13 @@ from collections import defaultdict
 import tensorflow as tf
 import numpy as np
 
-from baselines.common.vec_env.vec_frame_stack import VecFrameStack
+from baselines.common import models
 from baselines.common.cmd_util import common_arg_parser, parse_unknown_args, make_vec_env, make_env
 from baselines.common.tf_util import get_session
 from baselines import logger
 from importlib import import_module
+from openai.deepq.deepq import learn
 
-sys.path.append('../')
 
 from dotaenv import DotaEnvironment
 
@@ -37,11 +37,27 @@ def train(args, extra_args):
     env_id = 'dota2'
     print('env_type: {}'.format(env_type))
 
-    total_timesteps = int(args.num_timesteps)
     seed = args.seed
 
-    learn = get_learn_function(args.alg)
-    alg_kwargs = get_learn_function_defaults(args.alg, env_type)
+    alg_kwargs = dict(
+        network=models.mlp(num_hidden=64, num_layers=1),
+        lr=1e-4,
+        buffer_size=10000,
+        total_timesteps=500000,
+        exploration_fraction=1.0,
+        exploration_initial_eps=0.5,
+        exploration_final_eps=0.1,
+        train_freq=4,
+        learning_starts=1000,
+        target_network_update_freq=1000,
+        gamma=0.99,
+        batch_size=32,
+        prioritized_replay=True,
+        prioritized_replay_alpha=0.6,
+        checkpoint_freq=10000,
+        checkpoint_path='experiments/checkpoints',
+        dueling=True
+    )
     alg_kwargs.update(extra_args)
 
     env = DotaEnvironment()
@@ -57,42 +73,10 @@ def train(args, extra_args):
     model = learn(
         env=env,
         seed=seed,
-        total_timesteps=total_timesteps,
         **alg_kwargs
     )
 
     return model, env
-
-
-def build_env(args):
-    ncpu = multiprocessing.cpu_count()
-    if sys.platform == 'darwin': ncpu //= 2
-    nenv = args.num_env or ncpu
-    alg = args.alg
-    seed = args.seed
-
-    env_type, env_id = get_env_type(args.env)
-
-    if env_type in {'atari', 'retro'}:
-        if alg == 'deepq':
-            env = make_env(env_id, env_type, seed=seed, wrapper_kwargs={'frame_stack': True})
-        elif alg == 'trpo_mpi':
-            env = make_env(env_id, env_type, seed=seed)
-        else:
-            frame_stack_size = 4
-            env = make_vec_env(env_id, env_type, nenv, seed, gamestate=args.gamestate, reward_scale=args.reward_scale)
-            env = VecFrameStack(env, frame_stack_size)
-
-    else:
-       config = tf.ConfigProto(allow_soft_placement=True,
-                               intra_op_parallelism_threads=1,
-                               inter_op_parallelism_threads=1)
-       config.gpu_options.allow_growth = True
-       get_session(config=config)
-
-       env = make_vec_env(env_id, env_type, args.num_env or 1, seed, reward_scale=args.reward_scale)
-
-    return env
 
 
 def get_env_type(env_id):
@@ -158,6 +142,7 @@ def parse_cmdline_kwargs(args):
 
 def main(args):
     # configure logger, disable logging in child MPI processes (with rank > 0)
+    np.set_printoptions(precision=3)
 
     arg_parser = common_arg_parser()
     args, unknown_args = arg_parser.parse_known_args(args)

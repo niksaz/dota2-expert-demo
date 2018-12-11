@@ -17,11 +17,11 @@ def prepare_steam_client():
     else:
         # "Search your computer" Ubuntu function
         gui.click(x=32, y=56)
-        gui.typewrite('steam', interval=INTERVAL)
+        gui.typewrite('steam', interval=INTERVAL, pause=PAUSE)
 
         # Run the first option
         gui.press('enter', pause=PAUSE)
-        time.sleep(30)
+        time.sleep(40)
 
 
 def prepare_dota_client():
@@ -36,7 +36,7 @@ def prepare_dota_client():
         gui.click(x=416, y=236, pause=30)
         enable_cheats()
         start_game()
-        time.sleep(30)
+        time.sleep(40)
 
 
 def start_game():
@@ -71,9 +71,9 @@ def restart_game():
     # Start the game timer right away
     gui.press('\\', pause=PAUSE)
     gui.typewrite('dota_dev forcegamestart', interval=INTERVAL)
-    gui.press('enter', pause=PAUSE)
+    gui.press('enter')
     gui.typewrite('host_timescale 10', interval=INTERVAL)
-    gui.press('enter', pause=PAUSE)
+    gui.press('enter')
     gui.press('\\', pause=PAUSE)
 
 

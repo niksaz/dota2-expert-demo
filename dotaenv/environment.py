@@ -20,7 +20,7 @@ class DotaEnvironment(gym.Env):
         self.action_space = spaces.Discrete(ACTIONS_TOTAL)
 
         low = np.array([-1.0, -1.0, 0, 0, 0, 0, 0, 0, 0, 0], dtype=np.float32)
-        high = np.array([1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0,], dtype=np.float32)
+        high = np.array([1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0], dtype=np.float32)
         assert low.size == STATE_DIM
         assert high.size == STATE_DIM
         self.observation_space = spaces.Box(low, high, dtype=np.float32)
@@ -40,7 +40,9 @@ class DotaEnvironment(gym.Env):
             self.close()
         runner.restart_game()
         observation, _, _ = server.get_observation()
-        return observation
+        # Sometimes the Dota 2 client takes more time than planned and then
+        # we need to reset it once again
+        return observation if len(observation) != 0 else self.reset()
 
     def render(self, mode='human'):
         # It is rendered in the Dota 2 client
