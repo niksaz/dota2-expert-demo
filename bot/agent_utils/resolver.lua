@@ -1,6 +1,6 @@
 -- Verifies the validity of actions.
 
-Resolver = {}
+local Resolver = {}
 Resolver.total_dirs = 8
 Resolver.move_radius = 100
 

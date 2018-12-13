@@ -1,7 +1,10 @@
-Action = {}
+-- Action execution module.
+
+local Action = {}
 
 local Resolver = require(GetScriptDirectory() .. '/agent_utils/resolver')
-local bot = GetBot()
+local Config = require(GetScriptDirectory() .. 'config')
+local agent = Config.agent
 
 local NEARBY_RADIUS = 1500
 local ACTION_MOVE = 0
@@ -15,10 +18,10 @@ local ACTION_DO_NOTHING = 6
 local wrong_action = 0
 
 local ABILITY = {
-    bot:GetAbilityByName('nevermore_shadowraze1'),
-    bot:GetAbilityByName('nevermore_shadowraze2'),
-    bot:GetAbilityByName('nevermore_shadowraze3'),
-    bot:GetAbilityByName('nevermore_requiem')
+    agent:GetAbilityByName('nevermore_shadowraze1'),
+    agent:GetAbilityByName('nevermore_shadowraze2'),
+    agent:GetAbilityByName('nevermore_shadowraze3'),
+    agent:GetAbilityByName('nevermore_requiem')
 }
 
 --- Move by the delta vector.
@@ -26,9 +29,9 @@ local ABILITY = {
 --
 function move_delta(delta_vector)
     print('MOVE BY DELTA', delta_vector[1], delta_vector[2])
-    local position = bot:GetLocation()
+    local position = agent:GetLocation()
     if Resolver.can_move_by_delta(position, delta_vector) then
-        bot:Action_MoveDirectly(position + delta_vector)
+        agent:Action_MoveDirectly(position + delta_vector)
     else
         wrong_action = 1
     end
@@ -50,7 +53,7 @@ function use_ability(ability_idx)
     print('USE ABILITY', ability_idx)
     local ability = ABILITY[ability_idx]
     if ability:IsFullyCastable() then
-        bot:Action_UseAbility(ability)
+        agent:Action_UseAbility(ability)
     else
         wrong_action = 1
     end
@@ -59,9 +62,9 @@ end
 --- Attack the closest enemy hero nearby.
 function attack_hero()
     print('ATTACK HERO')
-    local enemy_heroes_list = bot:GetNearbyHeroes(NEARBY_RADIUS, true, BOT_MODE_NONE)
+    local enemy_heroes_list = agent:GetNearbyHeroes(NEARBY_RADIUS, true, BOT_MODE_NONE)
     if #enemy_heroes_list > 0 then
-        bot:Action_AttackUnit(enemy_heroes_list[1], false)
+        agent:Action_AttackUnit(enemy_heroes_list[1], false)
     else
         wrong_action = 1
     end
@@ -72,9 +75,9 @@ end
 --
 function attack_creep(creep_idx)
     print('ATTACK CREEP', creep_idx)
-    local enemy_creeps = bot:GetNearbyCreeps(NEARBY_RADIUS, true)
+    local enemy_creeps = agent:GetNearbyCreeps(NEARBY_RADIUS, true)
     if #enemy_creeps >= creep_idx then
-        bot:Action_AttackUnit(enemy_creeps[creep_idx], false)
+        agent:Action_AttackUnit(enemy_creeps[creep_idx], false)
     else
         wrong_action = 1
     end
@@ -83,9 +86,9 @@ end
 -- Attack nearby enemy tower.
 function attack_tower()
     print('ATTACK TOWER')
-    local towers = bot:GetNearbyTowers(NEARBY_RADIUS, true)
+    local towers = agent:GetNearbyTowers(NEARBY_RADIUS, true)
     if #towers > 0 then
-        bot:Action_AttackUnit(towers[1], false)
+        agent:Action_AttackUnit(towers[1], false)
     else
         wrong_action = 1
     end
@@ -95,7 +98,7 @@ end
 function upgrade_abilities()
     for _, ability in ipairs(ABILITY) do
         if ability:CanAbilityBeUpgraded() then
-            bot:ActionImmediate_LevelAbility(ability:GetName())
+            agent:ActionImmediate_LevelAbility(ability:GetName())
         end
     end
 end

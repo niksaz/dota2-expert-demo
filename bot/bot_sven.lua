@@ -1,3 +1,3 @@
-function Think(  )
+function Think()
     --dummy function
 end

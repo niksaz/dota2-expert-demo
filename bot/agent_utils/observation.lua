@@ -1,22 +1,23 @@
--- Observation module
+-- Observation generation module.
 
 local Observation = {}
 
 local Resolver = require(GetScriptDirectory() .. '/agent_utils/resolver')
+local Config = require(GetScriptDirectory() .. 'config')
+local agent = Config.agent
 
-local bot = GetBot()
-local bot_player_id = bot:GetPlayerID()
+local agent_player_id = agent:GetPlayerID()
 
 local NEARBY_RADIUS = 1500
---local ability1 = bot:GetAbilityByName('nevermore_shadowraze1')
---local ability2 = bot:GetAbilityByName('nevermore_shadowraze2')
---local ability3 = bot:GetAbilityByName('nevermore_shadowraze3')
---local ability4 = bot:GetAbilityByName('nevermore_requiem')
+--local ability1 = agent:GetAbilityByName('nevermore_shadowraze1')
+--local ability2 = agent:GetAbilityByName('nevermore_shadowraze2')
+--local ability3 = agent:GetAbilityByName('nevermore_shadowraze3')
+--local ability4 = agent:GetAbilityByName('nevermore_requiem')
 
 function get_hero_info()
     local hero_info = {}
 
-    local self_position = bot:GetLocation()
+    local self_position = agent:GetLocation()
     -- Normalized coordinates of the hero (original range is [-8288; 8288])
     table.insert(hero_info, {
         self_position[1] / 8288.0,
@@ -30,35 +31,35 @@ function get_hero_info()
         })
     end
     -- Info about health
-    table.insert(hero_info, { bot:GetHealth() / bot:GetMaxHealth()})
+    table.insert(hero_info, { agent:GetHealth() / agent:GetMaxHealth()})
     return hero_info
 end
 
 function get_enemy_info()
     local enemy_info = {}
     -- Info about nearby enemy creeps
-    local enemy_creeps = get_creeps_info(bot:GetNearbyCreeps(NEARBY_RADIUS, true))
+    local enemy_creeps = get_creeps_info(agent:GetNearbyCreeps(NEARBY_RADIUS, true))
     if #enemy_creeps > 0 then
         local creep = creeps[1]
-        local creep_dst = GetUnitToUnitDistance(bot, creep) / NEARBY_RADIUS
+        local creep_dst = GetUnitToUnitDistance(agent, creep) / NEARBY_RADIUS
         table.insert(enemy_info, {0, creep_dst})
     else
         table.insert(enemy_info, {1, 1})
     end
     -- Info about nearby enemy heroes
-    local enemy_heroes = bot:GetNearbyHeroes(NEARBY_RADIUS, true, BOT_MODE_NONE)
+    local enemy_heroes = agent:GetNearbyHeroes(NEARBY_RADIUS, true, BOT_MODE_NONE)
     if #enemy_heroes > 0 then
         local hero = enemy_heroes[1]
-        local hero_dst = GetUnitToUnitDistance(bot, hero) / NEARBY_RADIUS
+        local hero_dst = GetUnitToUnitDistance(agent, hero) / NEARBY_RADIUS
         table.insert(enemy_info, {0, hero_dst})
     else
         table.insert(enemy_info, {1, 1})
     end
     -- Info about nearby enemy towers
-    local enemy_towers = bot:GetNearbyTowers(NEARBY_RADIUS, true)
+    local enemy_towers = agent:GetNearbyTowers(NEARBY_RADIUS, true)
     if #enemy_towers > 0 then
         local tower = enemy_towers[1]
-        local tower_dst = GetUnitToUnitDistance(bot, tower) / NEARBY_RADIUS
+        local tower_dst = GetUnitToUnitDistance(agent, tower) / NEARBY_RADIUS
         table.insert(enemy_info, {0, tower_dst})
     else
         table.insert(enemy_info, {1, 1})
@@ -93,8 +94,8 @@ function Observation.is_done()
     local _end = false
 
     if GetGameState() == GAME_STATE_POST_GAME or
-            GetHeroKills(bot_player_id) > 0 or
-            GetHeroDeaths(bot_player_id) > 0 or
+            GetHeroKills(agent_player_id) > 0 or
+            GetHeroDeaths(agent_player_id) > 0 or
             DotaTime() > 360 then
         _end = true
         print('Bot: the game has ended.')
