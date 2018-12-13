@@ -88,7 +88,7 @@ function get_self_info()
         local dir_vector = Resolver.delta_vector_for_dir(dir)
         self_info[3+dir] = Resolver.can_move_by_delta(self_position, dir_vector) and 1 or 0
     end
---    self_info[3+Resolver.total_dirs] = bot:GetHealth() / bot:GetMaxHealth()
+    self_info[3+Resolver.total_dirs] = bot:GetHealth() / bot:GetMaxHealth()
 
 --        bot:GetFacing(),
 --        bot:GetAttackDamage(),
@@ -160,9 +160,9 @@ function Observation.get_observation()
 
     local observation = {
         ['self_info'] = get_self_info(),
---        ['enemy_creeps_info'] = enemy_creeps,
---        ['enemy_info'] = get_enemy_hero_info(),
---        ['tower_info'] = get_towers_info(),
+        ['enemy_creeps_info'] = enemy_creeps,
+        ['enemy_info'] = get_enemy_hero_info(),
+        ['tower_info'] = get_towers_info(),
 --        ['ally_creeps_info'] = ally_creeps,
 --        ['damage_info'] = get_damage_info()
     }
@@ -177,8 +177,7 @@ function Observation.is_done()
     if GetGameState() == GAME_STATE_POST_GAME or
             GetHeroKills(bot_player_id) > 0 or
             GetHeroDeaths(bot_player_id) > 0 or
-            DotaTime() > 360 or
-            Reward.is_near_ally_tower() == 1 then
+            DotaTime() > 360 then
         _end = true
         print('Bot: the game has ended.')
     end

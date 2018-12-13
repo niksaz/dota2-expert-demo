@@ -63,6 +63,9 @@ class ReplayRewardShaper:
 def main():
     replay_processor = ReplayRewardShaper('../replays')
     replay_processor.load()
+    for demo in replay_processor.demos:
+        for state in demo:
+            print(state)
 
 
 if __name__ == '__main__':

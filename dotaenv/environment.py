@@ -19,8 +19,10 @@ class DotaEnvironment(gym.Env):
 
         self.action_space = spaces.Discrete(ACTIONS_TOTAL)
 
-        low = np.array([-1.0, -1.0, 0, 0, 0, 0, 0, 0, 0, 0], dtype=np.float32)
-        high = np.array([1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0], dtype=np.float32)
+        low = np.zeros(14, dtype=np.float32)
+        low[0] = -1.0  # For x coordinate
+        low[1] = -1.0  # For y coordinate
+        high = np.ones(14, dtype=np.float32)
         assert low.size == STATE_DIM
         assert high.size == STATE_DIM
         self.observation_space = spaces.Box(low, high, dtype=np.float32)

@@ -85,11 +85,11 @@ def vectorize_observation(observation):
     # enemy:GetMana()
     # enemy:GetFacing()
     # 7 values
-    # result.extend(observation['enemy_creeps_info'])
+    result.extend(observation['enemy_creeps_info'])
 
-    # result.extend(observation['enemy_info'])
+    result.extend(observation['enemy_info'])
 
-    # result.extend(observation['tower_info'])
+    result.extend(observation['tower_info'])
 
     # info about 10 nearby enemy creeps
     # creep:GetHealth()

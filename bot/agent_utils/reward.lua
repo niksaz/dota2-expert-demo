@@ -126,16 +126,15 @@ function Reward.get_reward(wrong_action)
 
     local reward = 0
 
-    if Reward.is_near_ally_tower() == 1 then
-        reward = reward + 100
-    end
-
---    local attack_time = bot:GetLastAttackTime()
---    if attack_time ~= nil and (last_attack_time == nil or attack_time >
---            last_attack_time) then
---        reward = reward + 5
+--    if Reward.is_near_ally_tower() == 1 then
+--        reward = reward + 100
 --    end
---    last_attack_time = attack_time
+
+    local attack_time = bot:GetLastAttackTime()
+    if attack_time ~= nil and (last_attack_time == nil or attack_time > last_attack_time) then
+        reward = reward + 5
+    end
+    last_attack_time = attack_time
 
 --  if wrong_action == 1 then
 --      reward = reward - 0.1
