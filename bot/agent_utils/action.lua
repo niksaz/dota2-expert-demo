@@ -4,7 +4,7 @@ local Action = {}
 
 local Resolver = require(GetScriptDirectory() .. '/agent_utils/resolver')
 local Config = require(GetScriptDirectory() .. '/config')
-local agent = Config.agent
+local agent = Config.agent_to_act
 
 local NEARBY_RADIUS = 1500
 local ACTION_MOVE = 0
@@ -18,10 +18,10 @@ local ACTION_DO_NOTHING = 6
 local wrong_action = 0
 
 local ABILITY = {
-    agent:GetAbilityByName('nevermore_shadowraze1'),
-    agent:GetAbilityByName('nevermore_shadowraze2'),
-    agent:GetAbilityByName('nevermore_shadowraze3'),
-    agent:GetAbilityByName('nevermore_requiem')
+    agent:GetAbilityInSlot(0),
+    agent:GetAbilityInSlot(1),
+    agent:GetAbilityInSlot(2),
+    agent:GetAbilityInSlot(3),
 }
 
 --- Move by the delta vector.

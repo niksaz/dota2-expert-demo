@@ -6,14 +6,10 @@ local Resolver = require(GetScriptDirectory() .. '/agent_utils/resolver')
 local Func = require(GetScriptDirectory() .. '/util/func')
 local Config = require(GetScriptDirectory() .. '/config')
 
-local agent = Config.agent
+local agent = Config.agent_to_observe
 local agent_player_id = agent:GetPlayerID()
 
 local NEARBY_RADIUS = 1500
---local ability1 = agent:GetAbilityByName('nevermore_shadowraze1')
---local ability2 = agent:GetAbilityByName('nevermore_shadowraze2')
---local ability3 = agent:GetAbilityByName('nevermore_shadowraze3')
---local ability4 = agent:GetAbilityByName('nevermore_requiem')
 
 function get_hero_info()
     local hero_info = {}
