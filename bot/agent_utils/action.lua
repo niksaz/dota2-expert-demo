@@ -3,7 +3,7 @@
 local Action = {}
 
 local Resolver = require(GetScriptDirectory() .. '/agent_utils/resolver')
-local Config = require(GetScriptDirectory() .. 'config')
+local Config = require(GetScriptDirectory() .. '/config')
 local agent = Config.agent
 
 local NEARBY_RADIUS = 1500
