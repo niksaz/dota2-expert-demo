@@ -1,17 +1,11 @@
 # Author: Mikita Sazanovich
 
-import numpy as np
-
 
 class StatePreprocessor:
 
     @staticmethod
     def process(state):
-        state = np.copy(state)
-        if len(state) > 0:
-            state[0] = StatePreprocessor._process_coordinate(state[0])
-        if len(state) > 1:
-            state[1] = StatePreprocessor._process_coordinate(state[1])
+        # Currently we do not preprocess the state returned from the Dota 2
         return state
 
     @staticmethod

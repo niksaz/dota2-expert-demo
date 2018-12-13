@@ -1,9 +1,8 @@
 # Author: Mikita Sazanovich
 
-# Taking first 11 dimensions
-STATE_PROJECT = range(14)
-SHAPER_STATE_PROJECT = range(2)
+STATE_PROJECT = range(17)
 STATE_DIM = len(STATE_PROJECT)
+SHAPER_STATE_PROJECT = range(17)
 
 # First actions are movement actions towards (360 / total * action_number)°
 MOVE_ACTIONS_TOTAL = 8

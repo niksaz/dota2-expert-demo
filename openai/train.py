@@ -40,7 +40,7 @@ def train(args, extra_args):
     seed = args.seed
 
     alg_kwargs = dict(
-        network=models.mlp(num_hidden=64, num_layers=1),
+        network=models.mlp(num_hidden=128, num_layers=1),
         lr=1e-4,
         buffer_size=10000,
         total_timesteps=500000,
