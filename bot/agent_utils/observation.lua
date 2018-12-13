@@ -6,7 +6,7 @@ local Resolver = require(GetScriptDirectory() .. '/agent_utils/resolver')
 local Func = require(GetScriptDirectory() .. '/util/func')
 local Config = require(GetScriptDirectory() .. '/config')
 
-local agent = Config.agent_to_observe
+local agent = Config.is_in_training_mode and GetBot() or GetTeamMember(1)
 local agent_player_id = agent:GetPlayerID()
 
 local NEARBY_RADIUS = 1500
@@ -80,7 +80,7 @@ function Observation.is_done()
     if GetGameState() == GAME_STATE_POST_GAME or
             GetHeroKills(agent_player_id) > 0 or
             GetHeroDeaths(agent_player_id) > 0 or
-            DotaTime() > 360 then
+            DotaTime() > (Config.is_in_training_mode and 360 or 120) then
         _end = true
         print('Bot: the game has ended.')
     end

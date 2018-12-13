@@ -11,10 +11,12 @@ def record(filename):
     env = DotaEnvironment()
 
     state = env.reset()
+    print(state)
     states = [state]
     done = False
     while not done:
-        state, reward, done = env.execute(action=ATTACK_CREEP)
+        state, _, done, _ = env.step(action=ATTACK_CREEP)
+        print(state)
         states.append(state)
 
     with open(filename, 'wb') as output_file:
@@ -37,7 +39,10 @@ def main():
     parser.add_argument('--print', action='store_true', help='Print the recorded actions')
     args = parser.parse_args()
 
-    filename = os.path.join('replays/', args.replay_name)
+    replays_folder = 'replays'
+    if not os.path.exists(replays_folder):
+        os.makedirs(replays_folder)
+    filename = os.path.join(replays_folder, args.replay_name)
 
     if args.record:
         record(filename)

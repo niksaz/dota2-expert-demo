@@ -37,7 +37,9 @@ class ReplayRewardShaper:
     def __process_replay(self, replay):
         demo = []
         for replay_step in replay:
-            state, action_obs = replay_step
+            if len(replay_step) == 0:
+                continue
+            state = replay_step
             state_proj = state[SHAPER_STATE_PROJECT]
             state_proc = self.state_preprocessor.process(state_proj)
             if not demo or np.linalg.norm(demo[len(demo) - 1] - state_proc) > 0:

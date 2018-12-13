@@ -2,8 +2,7 @@
 
 local Reward = {}
 
-local Config = require(GetScriptDirectory() .. '/config')
-local agent = Config.agent
+local agent = GetBot()
 
 local agent_player_id = agent:GetPlayerID()
 
