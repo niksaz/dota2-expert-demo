@@ -2,7 +2,7 @@
 
 STATE_PROJECT = range(17)
 STATE_DIM = len(STATE_PROJECT)
-SHAPER_STATE_PROJECT = range(17)
+SHAPER_STATE_PROJECT = range(2)
 
 # First actions are movement actions towards (360 / total * action_number)°
 MOVE_ACTIONS_TOTAL = 8

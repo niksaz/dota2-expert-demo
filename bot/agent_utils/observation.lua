@@ -37,7 +37,7 @@ function get_enemy_info()
     -- Info about nearby enemy creeps
     local enemy_creeps = agent:GetNearbyCreeps(NEARBY_RADIUS, true)
     if #enemy_creeps > 0 then
-        local creep = creeps[1]
+        local creep = enemy_creeps[1]
         local creep_dst = GetUnitToUnitDistance(agent, creep) / NEARBY_RADIUS
         Func.extend_table(enemy_info, {0, creep_dst})
     else

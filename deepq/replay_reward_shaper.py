@@ -66,8 +66,11 @@ def main():
     replay_processor = ReplayRewardShaper('../replays')
     replay_processor.load()
     for demo in replay_processor.demos:
+        last_state = demo[0]
         for state in demo:
+            print('dst', np.linalg.norm(last_state - state))
             print(state)
+            last_state = state
 
 
 if __name__ == '__main__':
