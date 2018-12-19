@@ -134,7 +134,7 @@ function Reward.get_reward(wrong_action)
 
     local attack_time = agent:GetLastAttackTime()
     if attack_time ~= nil and (last_attack_time == nil or attack_time > last_attack_time) then
-        reward = reward + 5
+        reward = reward + 1
     end
     last_attack_time = attack_time
 
