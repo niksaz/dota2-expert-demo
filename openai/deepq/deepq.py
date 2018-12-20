@@ -333,7 +333,13 @@ def learn(env,
                 else:
                     obses_t, actions, rewards, obses_tp1, dones = replay_buffer.sample(batch_size)
                     weights, batch_idxes = np.ones_like(rewards), None
-                td_errors = train(obses_t, actions, rewards, obses_tp1, dones, weights)
+                td_errors, weighted_error = train(
+                    obses_t, actions, rewards, obses_tp1, dones, weights)
+
+                # Loss logging
+                summary = tf.Summary(value=[tf.Summary.Value(tag='weighted_error', simple_value=weighted_error)])
+                summary_writer.add_summary(summary, t)
+
                 if prioritized_replay:
                     new_priorities = np.abs(td_errors) + prioritized_replay_eps
                     replay_buffer.update_priorities(batch_idxes, new_priorities)
