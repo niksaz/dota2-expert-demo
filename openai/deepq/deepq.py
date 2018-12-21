@@ -107,7 +107,6 @@ def learn(env,
           batch_size=32,
           print_freq=1,
           checkpoint_freq=10000,
-          checkpoint_path=None,
           learning_starts=1000,
           gamma=1.0,
           target_network_update_freq=500,
@@ -118,6 +117,7 @@ def learn(env,
           prioritized_replay_eps=1e-6,
           param_noise=False,
           callback=None,
+          experiment_name='trial',
           load_path=None,
           **network_kwargs
           ):
@@ -177,6 +177,8 @@ def learn(env,
     callback: (locals, globals) -> None
         function called at every steps with state of the algorithm.
         If callback returns true training stops.
+    experiment_name: str
+        name of the experiment (default: trial)
     load_path: str
         path to load the model from. (default: None)
     **network_kwargs
@@ -250,13 +252,21 @@ def learn(env,
     reward_shaper = ReplayRewardShaper('replays/')
     reward_shaper.load()
 
-    summary_dir = 'experiments/summaries'
+    experiment_dir = os.path.join('experiments', experiment_name)
+    if not os.path.exists(experiment_dir):
+        os.makedirs(experiment_dir)
+
+    summary_dir = os.path.join(experiment_dir, 'summaries')
     if not os.path.exists(summary_dir):
         os.makedirs(summary_dir)
     summary_writer = tf.summary.FileWriter(summary_dir)
 
+    checkpoint_dir = os.path.join(experiment_dir, 'checkpoints')
+    if not os.path.exists(checkpoint_dir):
+        os.makedirs(checkpoint_dir)
+
     with tempfile.TemporaryDirectory() as td:
-        td = checkpoint_path or td
+        td = checkpoint_dir or td
 
         if not os.path.exists(td):
             os.makedirs(td)

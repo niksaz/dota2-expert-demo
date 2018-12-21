@@ -55,7 +55,7 @@ def train(args, extra_args):
         prioritized_replay=True,
         prioritized_replay_alpha=0.6,
         checkpoint_freq=10000,
-        checkpoint_path='experiments/checkpoints',
+        experiment_name=args.exp_name,
         dueling=True
     )
     alg_kwargs.update(extra_args)
@@ -130,7 +130,6 @@ def parse_cmdline_kwargs(args):
     convert a list of '='-spaced command-line arguments to a dictionary, evaluating python objects when possible
     '''
     def parse(v):
-
         assert isinstance(v, str)
         try:
             return eval(v)
@@ -148,6 +147,10 @@ def main(args):
     args, unknown_args = arg_parser.parse_known_args(args)
     extra_args = parse_cmdline_kwargs(unknown_args)
 
+    if args.exp_name is None:
+        print('Please, specify the name of the experiment in --exp_name')
+        exit(0)
+
     if MPI is None or MPI.COMM_WORLD.Get_rank() == 0:
         rank = 0
         logger.configure()
@@ -162,23 +165,25 @@ def main(args):
         save_path = osp.expanduser(args.save_path)
         model.save(save_path)
 
-    # if args.play:
-    #     logger.log("Running trained model")
-    #     env = build_env(args)
-    #     obs = env.reset()
-    #     def initialize_placeholders(nlstm=128,**kwargs):
-    #         return np.zeros((args.num_env or 1, 2*nlstm)), np.zeros((1))
-    #     state, dones = initialize_placeholders(**extra_args)
-    #     while True:
-    #         actions, _, state, _ = model.step(obs,S=state, M=dones)
-    #         obs, _, done, _ = env.step(actions)
-    #         env.render()
-    #         done = done.any() if isinstance(done, np.ndarray) else done
-    #
-    #         if done:
-    #             obs = env.reset()
-    #
-    #     env.close()
+    if args.play:
+        logger.log("Running trained model")
+        env = DotaEnvironment()
+        obs = env.reset()
+
+        def initialize_placeholders(nlstm=128,**kwargs):
+            return np.zeros((args.num_env or 1, 2*nlstm)), np.zeros((1))
+
+        state, dones = initialize_placeholders(**extra_args)
+        while True:
+            actions, _, state, _ = model.step(obs, S=state, M=dones)
+            obs, _, done, _ = env.step(actions)
+            env.render()
+            done = done.any() if isinstance(done, np.ndarray) else done
+
+            if done:
+                obs = env.reset()
+
+        env.close()
 
     return model
 
