@@ -31,8 +31,7 @@ class ReplayRewardShaper:
                 replay = pickle.load(dump_file)
             demo = self.__process_replay(replay)
             self.demos.append(demo)
-            # Only a single demo for now
-            break
+        assert len(self.demos) == 3
 
     def __process_replay(self, replay):
         demo = []
@@ -53,13 +52,14 @@ class ReplayRewardShaper:
         """
         if len(state) < len(SHAPER_STATE_PROJECT):
             return 0.0
+        max_potent = 0.0
         state = state[SHAPER_STATE_PROJECT]
         for demo in self.demos:
-            for i in reversed(range(len(demo))):
+            for i in range(len(demo)):
                 diff = np.linalg.norm(demo[i] - state)
                 if diff < EPS:
-                    return K*(i/len(demo))
-        return 0
+                    max_potent = max(max_potent, K*((i+1)/len(demo)))
+        return max_potent
 
 
 def main():
