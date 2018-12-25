@@ -31,7 +31,7 @@ class ReplayRewardShaper:
                 replay = pickle.load(dump_file)
             demo = self.__process_replay(replay)
             self.demos.append(demo)
-        assert len(self.demos) == 3
+        assert len(self.demos) == 10
 
     def __process_replay(self, replay):
         demo = []
