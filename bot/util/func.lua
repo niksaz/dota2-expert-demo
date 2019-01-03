@@ -22,4 +22,11 @@ function Func.extend_table(t1, t2)
     return t1
 end
 
+function Func.in_table(list, item)
+    for key, value in pairs(list) do
+        if value == item then return key end
+    end
+    return -1
+end
+
 return Func

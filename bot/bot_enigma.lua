@@ -77,11 +77,12 @@ end
 --- Send JSON with current state info.
 --
 function send_observation_message()
+    Observation.update_info_about_environment()
     local msg = {
         ['observation'] = Observation.get_observation(),
         ['reward'] = Reward.get_reward(wrong_action),
         ['done'] = Observation.is_done(),
-        ['state_num'] = state_num
+        ['action_info'] = Observation.get_action_info()
     }
 
     send_message(create_message(msg, 'observation'), '/observation', nil)
