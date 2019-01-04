@@ -8,7 +8,7 @@ import dotaenv.dota_runner as runner
 from dotaenv.codes import STATE_DIM, ACTIONS_TOTAL
 
 
-RESTART_AFTER_EPISODES = 100
+RESTART_AFTER_EPISODES = 10
 
 
 class DotaEnvironment(gym.Env):

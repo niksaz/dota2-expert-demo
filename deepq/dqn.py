@@ -10,7 +10,7 @@ import tensorflow as tf
 
 sys.path.append('../')
 
-from deepq import StateReplayRewardShaper, Estimator, StatePreprocessor, PrioritizedReplayBuffer
+from deepq import StatePotentialRewardShaper, Estimator, StatePreprocessor, PrioritizedReplayBuffer
 from deepq import get_last_episode
 from dotaenv import DotaEnvironment
 from dotaenv.codes import STATE_DIM, ACTIONS_TOTAL
@@ -115,7 +115,7 @@ def deep_q_learning(sess,
     # The epsilon decay schedule
     epsilons = np.linspace(epsilon_start, epsilon_end, epsilon_decay_steps)
 
-    reward_shaper = StateReplayRewardShaper('replays/')
+    reward_shaper = StatePotentialRewardShaper('replays/')
     reward_shaper.load()
 
     replay_buffer = PrioritizedReplayBuffer(

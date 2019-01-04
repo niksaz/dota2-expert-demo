@@ -19,7 +19,7 @@ from openai.deepq.utils import ObservationInput
 from baselines.common.tf_util import get_session
 from openai.deepq.models import build_q_func
 
-from deepq import StatePreprocessor, StateReplayRewardShaper
+from deepq import StatePreprocessor, ActionAdviceRewardShaper
 
 
 class ActWrapper(object):
@@ -249,7 +249,7 @@ def learn(env,
     reset = True
     last_reset_t = 0
 
-    reward_shaper = StateReplayRewardShaper('replays/')
+    reward_shaper = ActionAdviceRewardShaper('replays-action/')
     reward_shaper.load()
 
     experiment_dir = os.path.join('experiments', experiment_name)
@@ -301,27 +301,22 @@ def learn(env,
                 kwargs['reset'] = reset
                 kwargs['update_param_noise_threshold'] = update_param_noise_threshold
                 kwargs['update_param_noise_scale'] = True
-            action = act(np.array(obs)[None], update_eps=update_eps, **kwargs)[0]
-            env_action = action
+            action = act(np.array(obs)[None], reward_shaper.get_action_potentials([obs]), update_eps=update_eps, **kwargs)[0]
             reset = False
 
-            new_obs, rew, done, _ = env.step(env_action)
+            new_obs, rew, done, _ = env.step(action)
             if len(new_obs) == 0:
                 # Incorrect observation
                 done = True
             else:
-                new_obs = StatePreprocessor.process(new_obs)
-                logger.log('{}/{} obs {}'.format(t, total_timesteps, obs))
-                logger.log('{}/{} action {}'.format(t, total_timesteps, env_action))
-
                 episode_rewards[-1] += rew
 
-                # Apply reward-shaping based on the demonstration completion
-                rew += (gamma * reward_shaper.get_state_potential(new_obs) - reward_shaper.get_state_potential(obs))
+                new_obs = StatePreprocessor.process(new_obs)
+                logger.log('{}/{} obs {} action {}'.format(t, total_timesteps, obs, action))
+
                 # Store transition in the replay buffer.
                 replay_buffer.add(obs, action, rew, new_obs, float(done))
                 obs = new_obs
-                logger.log('{}/{} shaped_rew {}'.format(t, total_timesteps, rew))
 
             if done:
                 summary = tf.Summary(value=[tf.Summary.Value(tag="rewards", simple_value=episode_rewards[-1])])
@@ -345,8 +340,10 @@ def learn(env,
                 else:
                     obses_t, actions, rewards, obses_tp1, dones = replay_buffer.sample(batch_size)
                     weights, batch_idxes = np.ones_like(rewards), None
+                biases_t = reward_shaper.get_action_potentials(obses_t)
+                biases_tp1 = reward_shaper.get_action_potentials(obses_tp1)
                 td_errors, weighted_error = train(
-                    obses_t, actions, rewards, obses_tp1, dones, weights)
+                    obses_t, biases_t, actions, rewards, obses_tp1, biases_tp1, dones, weights)
 
                 # Loss logging
                 summary = tf.Summary(value=[tf.Summary.Value(tag='weighted_error', simple_value=weighted_error)])

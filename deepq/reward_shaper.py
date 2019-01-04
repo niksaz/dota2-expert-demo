@@ -36,7 +36,7 @@ class AbstractRewardShaper(ABC):
         pass
 
 
-class StateReplayRewardShaper(AbstractRewardShaper):
+class StatePotentialRewardShaper(AbstractRewardShaper):
     """
     Uses replays to parse demonstrated states and provides potentials based
     on them.
@@ -45,10 +45,10 @@ class StateReplayRewardShaper(AbstractRewardShaper):
     K = 100
 
     def __init__(self, replay_dir):
-        super(StateReplayRewardShaper, self).__init__(replay_dir)
+        super(StatePotentialRewardShaper, self).__init__(replay_dir)
 
     def load(self):
-        super(StateReplayRewardShaper, self).load()
+        super(StatePotentialRewardShaper, self).load()
         # Experimenting with the different number of replays
         replays_to_leave = 3
         self.demos = self.demos[:replays_to_leave]
@@ -78,20 +78,20 @@ class StateReplayRewardShaper(AbstractRewardShaper):
         for demo in self.demos:
             for i in range(len(demo)):
                 diff = np.linalg.norm(demo[i] - state)
-                if diff < StateReplayRewardShaper.CLOSE_TO_STATE_EPS:
-                    max_potent = max(max_potent, StateReplayRewardShaper.K*((i+1)/len(demo)))
+                if diff < StatePotentialRewardShaper.CLOSE_TO_STATE_EPS:
+                    max_potent = max(max_potent, StatePotentialRewardShaper.K * ((i + 1) / len(demo)))
         return max_potent
 
 
-class ActionReplayRewardShaper(AbstractRewardShaper):
+class ActionAdviceRewardShaper(AbstractRewardShaper):
     SIGMA = 0.2 * np.identity(STATE_DIM)
     K = 10
 
     def __init__(self, replay_dir):
-        super(ActionReplayRewardShaper, self).__init__(replay_dir)
+        super(ActionAdviceRewardShaper, self).__init__(replay_dir)
 
     def load(self):
-        super(ActionReplayRewardShaper, self).load()
+        super(ActionAdviceRewardShaper, self).load()
         print('Loaded %d action replays'.format(len(self.demos)))
 
     def process_replay(self, dumped_replay):
@@ -122,28 +122,25 @@ class ActionReplayRewardShaper(AbstractRewardShaper):
             demo.append((state, action))
         return demo
 
-    def get_action_advice(self, state, action):
-        best_value = 0
-        for demo in self.demos:
-            for demo_state, demo_action in demo:
-                if demo_action != action:
-                    continue
-                diff = state - demo_state
-                value = ActionReplayRewardShaper.K * \
-                        math.e ** (-1/2*diff.dot(ActionReplayRewardShaper.SIGMA).dot(diff))
-                if value > best_value:
-                    best_value = value
-        return best_value
+    def get_action_potentials(self, states):
+        potentials = np.zeros((len(states), ACTIONS_TOTAL), dtype=np.float32)
+        for idx, state in enumerate(states):
+            for demo in self.demos:
+                for demo_state, demo_action in demo:
+                    diff = state - demo_state
+                    value = ActionAdviceRewardShaper.K * \
+                            math.e ** (-1 / 2 * diff.dot(ActionAdviceRewardShaper.SIGMA).dot(diff))
+                    potentials[idx][demo_action] = max(potentials[idx][demo_action], value)
+        return potentials
 
 
 def main():
-    reward_shaper = ActionReplayRewardShaper('replays-action/')
+    reward_shaper = ActionAdviceRewardShaper('replays-action/')
     reward_shaper.load()
     for demo in reward_shaper.demos:
         for (state, action) in demo:
             print(state, action)
-            print('action-advice is',
-                  reward_shaper.get_action_advice(state, np.random.randint(0, ACTIONS_TOTAL)))
+            print('action potentials are:', reward_shaper.get_action_potentials([state]))
 
 
 if __name__ == '__main__':

@@ -175,13 +175,15 @@ def build_act(make_obs_ph, q_func, num_actions, scope="deepq", reuse=None):
     """
     with tf.variable_scope(scope, reuse=reuse):
         observations_ph = make_obs_ph("observation")
+        biases_ph = tf.placeholder(tf.float32, (None, num_actions), name="action_biases")
         stochastic_ph = tf.placeholder(tf.bool, (), name="stochastic")
         update_eps_ph = tf.placeholder(tf.float32, (), name="update_eps")
 
         eps = tf.get_variable("eps", (), initializer=tf.constant_initializer(0))
 
         q_values = q_func(observations_ph.get(), num_actions, scope="q_func")
-        deterministic_actions = tf.argmax(q_values, axis=1)
+        biased_q_values = q_values + biases_ph
+        deterministic_actions = tf.argmax(biased_q_values, axis=1)
 
         batch_size = tf.shape(observations_ph.get())[0]
         random_actions = tf.random_uniform(tf.stack([batch_size]), minval=0, maxval=num_actions, dtype=tf.int64)
@@ -190,12 +192,12 @@ def build_act(make_obs_ph, q_func, num_actions, scope="deepq", reuse=None):
 
         output_actions = tf.cond(stochastic_ph, lambda: stochastic_actions, lambda: deterministic_actions)
         update_eps_expr = eps.assign(tf.cond(update_eps_ph >= 0, lambda: update_eps_ph, lambda: eps))
-        _act = U.function(inputs=[observations_ph, stochastic_ph, update_eps_ph],
+        _act = U.function(inputs=[observations_ph, biases_ph, stochastic_ph, update_eps_ph],
                          outputs=output_actions,
                          givens={update_eps_ph: -1.0, stochastic_ph: True},
                          updates=[update_eps_expr])
-        def act(ob, stochastic=True, update_eps=-1):
-            return _act(ob, stochastic, update_eps)
+        def act(ob, biases_ph, stochastic=True, update_eps=-1):
+            return _act(ob, biases_ph, stochastic, update_eps)
         return act
 
 
@@ -380,9 +382,11 @@ def build_train(make_obs_ph, q_func, num_actions, optimizer, grad_norm_clipping=
     with tf.variable_scope(scope, reuse=reuse):
         # set up placeholders
         obs_t_input = make_obs_ph("obs_t")
+        biases_t = tf.placeholder(tf.float32, (None, num_actions), name="biases_t")
         act_t_ph = tf.placeholder(tf.int32, [None], name="action")
         rew_t_ph = tf.placeholder(tf.float32, [None], name="reward")
         obs_tp1_input = make_obs_ph("obs_tp1")
+        biases_tp1 = tf.placeholder(tf.float32, (None, num_actions), name="biases_tp1")
         done_mask_ph = tf.placeholder(tf.float32, [None], name="done")
         importance_weights_ph = tf.placeholder(tf.float32, [None], name="weight")
 
@@ -390,24 +394,33 @@ def build_train(make_obs_ph, q_func, num_actions, optimizer, grad_norm_clipping=
         q_t = q_func(obs_t_input.get(), num_actions, scope="q_func", reuse=True)  # reuse parameters from act
         q_func_vars = tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, scope=tf.get_variable_scope().name + "/q_func")
 
-        # target q network evalution
+        # q scores for actions which we know were selected in the given state.
+        q_t_selected = tf.reduce_sum(q_t * tf.one_hot(act_t_ph, num_actions), 1)
+        # action-advice potentials of the taken actions
+        f_t_selected = tf.reduce_sum(biases_t * tf.one_hot(act_t_ph, num_actions), 1)
+
+        # target q network evaluation
         q_tp1 = q_func(obs_tp1_input.get(), num_actions, scope="target_q_func")
         target_q_func_vars = tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, scope=tf.get_variable_scope().name + "/target_q_func")
 
-        # q scores for actions which we know were selected in the given state.
-        q_t_selected = tf.reduce_sum(q_t * tf.one_hot(act_t_ph, num_actions), 1)
-
         # compute estimate of best possible value starting from state at t + 1
+        # note the use of the biased-greedy policy in the action selection
         if double_q:
             q_tp1_using_online_net = q_func(obs_tp1_input.get(), num_actions, scope="q_func", reuse=True)
-            q_tp1_best_using_online_net = tf.argmax(q_tp1_using_online_net, 1)
-            q_tp1_best = tf.reduce_sum(q_tp1 * tf.one_hot(q_tp1_best_using_online_net, num_actions), 1)
+            q_tp1_using_online_net = q_tp1_using_online_net + biases_tp1
+            q_tp1_best_act = tf.argmax(q_tp1_using_online_net, 1)
         else:
-            q_tp1_best = tf.reduce_max(q_tp1, 1)
+            q_tp1_best_act = tf.argmax(q_tp1 + biases_tp1, 1)
+        q_tp1_best = tf.reduce_sum(q_tp1 * tf.one_hot(q_tp1_best_act, num_actions), 1)
         q_tp1_best_masked = (1.0 - done_mask_ph) * q_tp1_best
+        f_tp1_best = tf.reduce_sum(biases_tp1 * tf.one_hot(q_tp1_best_act, num_actions), 1)
 
         # compute RHS of bellman equation
-        q_t_selected_target = rew_t_ph + gamma * q_tp1_best_masked
+        q_t_selected_target = (
+            rew_t_ph
+            + gamma * q_tp1_best_masked
+            + gamma * f_tp1_best
+            - f_t_selected)
 
         # compute the error (potentially clipped)
         td_error = q_t_selected - tf.stop_gradient(q_t_selected_target)
@@ -435,9 +448,11 @@ def build_train(make_obs_ph, q_func, num_actions, optimizer, grad_norm_clipping=
         train = U.function(
             inputs=[
                 obs_t_input,
+                biases_t,
                 act_t_ph,
                 rew_t_ph,
                 obs_tp1_input,
+                biases_tp1,
                 done_mask_ph,
                 importance_weights_ph,
             ],
