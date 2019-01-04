@@ -19,7 +19,7 @@ from openai.deepq.utils import ObservationInput
 from baselines.common.tf_util import get_session
 from openai.deepq.models import build_q_func
 
-from deepq import StatePreprocessor, ReplayRewardShaper
+from deepq import StatePreprocessor, StateReplayRewardShaper
 
 
 class ActWrapper(object):
@@ -249,7 +249,7 @@ def learn(env,
     reset = True
     last_reset_t = 0
 
-    reward_shaper = ReplayRewardShaper('replays/')
+    reward_shaper = StateReplayRewardShaper('replays/')
     reward_shaper.load()
 
     experiment_dir = os.path.join('experiments', experiment_name)
@@ -273,7 +273,8 @@ def learn(env,
         model_file = os.path.join(td, "best_model")
         model_saved = False
 
-        if tf.train.latest_checkpoint(td) is not None:
+        if os.path.exists(model_file):
+            print('Model is loading')
             load_variables(model_file)
             logger.log('Loaded model from {}'.format(model_file))
             model_saved = True
@@ -310,7 +311,8 @@ def learn(env,
                 done = True
             else:
                 new_obs = StatePreprocessor.process(new_obs)
-                logger.log('{}/{} obs {} action {}'.format(t, total_timesteps, obs, env_action))
+                logger.log('{}/{} obs {}'.format(t, total_timesteps, obs))
+                logger.log('{}/{} action {}'.format(t, total_timesteps, env_action))
 
                 episode_rewards[-1] += rew
 

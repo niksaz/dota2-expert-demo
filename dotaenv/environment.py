@@ -29,8 +29,8 @@ class DotaEnvironment(gym.Env):
         server.run_app()
 
     def step(self, action):
-        state, reward, terminal = server.step(action=action)
-        return state, reward, terminal, {}
+        state, reward, terminal, info = server.step(action=action)
+        return state, reward, terminal, info
 
     def reset(self):
         server.reset()
@@ -39,7 +39,7 @@ class DotaEnvironment(gym.Env):
             self.episodes_experienced = 0
             self.close()
         runner.restart_game()
-        observation, _, _ = server.get_observation()
+        observation, _, _, _ = server.get_observation()
         # Sometimes the Dota 2 client takes more time than planned and then
         # we need to reset it once again
         return observation if len(observation) != 0 else self.reset()

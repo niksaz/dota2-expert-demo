@@ -232,6 +232,8 @@ def build_act_with_param_noise(make_obs_ph, q_func, num_actions, scope="deepq", 
         function to select and action given observation.
 `       See the top of the file for details.
     """
+    print('It is not implemented for action-advice yet. Exiting...')
+    exit(0)
     if param_noise_filter_func is None:
         param_noise_filter_func = default_param_noise_filter
 

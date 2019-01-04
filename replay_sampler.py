@@ -10,17 +10,17 @@ import os
 def record(filename):
     env = DotaEnvironment()
 
-    state = env.reset()
-    print(state)
-    states = [state]
+    env.reset()
+    state_action_pairs = []
     done = False
     while not done:
-        state, _, done, _ = env.step(action=ATTACK_CREEP)
-        print(state)
-        states.append(state)
+        state, _, done, info = env.step(action=ATTACK_CREEP)
+        next_pair = (state, info)
+        print(next_pair)
+        state_action_pairs.append(next_pair)
 
     with open(filename, 'wb') as output_file:
-        pickle.dump(states, output_file)
+        pickle.dump(state_action_pairs, output_file)
 
 
 def print_out(filename):
@@ -39,7 +39,7 @@ def main():
     parser.add_argument('--print', action='store_true', help='Print the recorded actions')
     args = parser.parse_args()
 
-    replays_folder = 'replays'
+    replays_folder = 'replays-action'
     if not os.path.exists(replays_folder):
         os.makedirs(replays_folder)
     filename = os.path.join(replays_folder, args.replay_name)

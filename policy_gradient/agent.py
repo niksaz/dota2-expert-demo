@@ -9,7 +9,7 @@ from policy_gradient.analyze_model import print_network_weights
 from policy_gradient.network import Network
 from policy_gradient.replay_buffer import ReplayBuffer
 from dotaenv.codes import STATE_DIM, ACTIONS_TOTAL
-from deepq.replay_reward_shaper import ReplayRewardShaper
+from deepq.reward_shaper import StateReplayRewardShaper
 from deepq.state_preprocessor import StatePreprocessor
 
 logger = logging.getLogger('DotaRL.PGAgent')
@@ -64,7 +64,7 @@ class PGAgent:
                                      eps=self.eps))
 
     def train(self):
-        reward_shaper = ReplayRewardShaper('../replays/')
+        reward_shaper = StateReplayRewardShaper('replays/')
         reward_shaper.load()
 
         episode_rewards = []
