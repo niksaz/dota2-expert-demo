@@ -301,7 +301,8 @@ def learn(env,
                 kwargs['reset'] = reset
                 kwargs['update_param_noise_threshold'] = update_param_noise_threshold
                 kwargs['update_param_noise_scale'] = True
-            action = act(np.array(obs)[None], reward_shaper.get_action_potentials([obs]), update_eps=update_eps, **kwargs)[0]
+            biases = reward_shaper.get_action_potentials([obs])
+            action = act(np.array(obs)[None], biases, update_eps=update_eps, **kwargs)[0]
             reset = False
 
             new_obs, rew, done, _ = env.step(action)

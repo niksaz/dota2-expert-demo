@@ -85,6 +85,8 @@ class StatePotentialRewardShaper(AbstractRewardShaper):
 
 class ActionAdviceRewardShaper(AbstractRewardShaper):
     SIGMA = 0.2 * np.identity(STATE_DIM)
+    SIGMA[0][0] = 1.0
+    SIGMA[1][1] = 1.0
     K = 10
 
     def __init__(self, replay_dir):
