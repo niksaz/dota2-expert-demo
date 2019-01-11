@@ -153,7 +153,6 @@ function Reward.get_reward(wrong_action)
 --    last_my_health = my_health
 --    last_enemy_health = enemy_health
 
-    print('reward: ', reward)
     return reward
 end
 

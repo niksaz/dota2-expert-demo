@@ -6,7 +6,7 @@ from flask import jsonify
 from flask import abort
 import logging
 
-from dotaenv.bot_util import message_to_observation, action_to_json
+from dotaenv.bot_util import message_to_pairs, action_to_json
 
 logger = logging.getLogger('dota2env.bot_server')
 
@@ -52,7 +52,7 @@ def reset():
     changed_condition.release()
 
 
-def get_observation():
+def get_observation_pairs():
     """
     Gets an observation from the dota thread.
 
@@ -71,7 +71,7 @@ def get_observation():
     changed_condition.notify_all()
     changed_condition.release()
 
-    return message_to_observation(result)
+    return message_to_pairs(result)
 
 
 def step(action):
@@ -93,7 +93,7 @@ def step(action):
     changed_condition.notify_all()
     changed_condition.release()
 
-    return get_observation()
+    return get_observation_pairs()
 
 
 @app.route('/observation', methods=['POST'])

@@ -7,8 +7,8 @@ local Observation = require(GetScriptDirectory() .. '/agent_utils/observation')
 local Reward = require(GetScriptDirectory() .. '/agent_utils/reward')
 local Action = require(GetScriptDirectory() .. '/agent_utils/action')
 
-local current_action
-local state_num = 0
+local action_to_do_next
+local current_action = Action.DO_NOTHING
 
 -- Bot communication automaton.
 local IDLE = 0
@@ -18,12 +18,13 @@ local fsm_state = SEND_OBSERVATION
 
 local wrong_action = 0
 
+local messages = {}
+
 --- Executes received action.
 -- @param action_info bot action
 --
-function execute_action(action_info)
-    print("Execute order.", action_info)
-    wrong_action = Action.execute_action(action_info)
+function execute_action(action)
+    wrong_action = Action.execute_action(action)
 end
 
 --- Create JSON message from table 'message' of type 'type'.
@@ -57,7 +58,7 @@ function send_message(json_message, route, callback)
                     if callback ~= nil then
                         callback(response)
                     end
-                    current_action = response['action']
+                    action_to_do_next = response['action']
                     fsm_state = response['fsm_state']
                 else
                     fsm_state = WHAT_NEXT
@@ -74,33 +75,35 @@ function send_what_next_message()
     send_message(message, '/what_next', nil)
 end
 
---- Send JSON with current state info.
+--- Send JSON with the message.
 --
-function send_observation_message()
+function send_observation_message(msg)
+    send_message(create_message(msg, 'observation'), '/observation', nil)
+end
+
+function Think()
+    -- current state info
     Observation.update_info_about_environment()
-    local msg = {
+    local message = {
         ['observation'] = Observation.get_observation(),
         ['reward'] = Reward.get_reward(wrong_action),
         ['done'] = Observation.is_done(),
         ['action_info'] = Observation.get_action_info()
     }
+    table.insert(messages, {current_action, message})
+    current_action = Action.DO_NOTHING
 
-    send_message(create_message(msg, 'observation'), '/observation', nil)
-    state_num = state_num + 1
-end
-
-local last_time_sent = GameTime()
-
-function Think()
     if fsm_state == SEND_OBSERVATION then
-        print('Sending')
         fsm_state = IDLE
-        send_observation_message()
-        last_time_sent = GameTime()
+        send_observation_message(messages)
+        print('FRAMES SENT', #messages)
+        messages = {}
     elseif fsm_state == ACTION_RECEIVED then
         fsm_state = SEND_OBSERVATION
-        execute_action(current_action)
+        current_action = action_to_do_next
     elseif fsm_state == IDLE then
         -- Do nothing
     end
+
+    execute_action(current_action)
 end

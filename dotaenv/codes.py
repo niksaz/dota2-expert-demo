@@ -14,4 +14,5 @@ ATTACK_HERO = ATTACK_CREEP + 1
 # Action to attack the enemy middle tower
 ATTACK_TOWER = ATTACK_HERO + 1
 
+# The last action does nothing
 ACTIONS_TOTAL = MOVE_ACTIONS_TOTAL + 3

@@ -21,7 +21,7 @@ def prepare_steam_client():
 
         # Run the first option
         gui.press('enter', pause=PAUSE)
-        time.sleep(40)
+        time.sleep(30)
 
 
 def prepare_dota_client():
@@ -34,9 +34,8 @@ def prepare_dota_client():
 
         # Press play
         gui.click(x=416, y=236, pause=30)
-        enable_cheats()
+        calibrate_dota_client()
         start_game()
-        time.sleep(40)
 
 
 def start_game():
@@ -48,7 +47,7 @@ def start_game():
     # Start
     gui.click(x=RIGHT_BOT_BUTTON_X, y=RIGHT_BOT_BUTTON_Y, duration=DURATION, pause=PAUSE)
     # Create lobby
-    gui.click(x=854, y=380, duration=DURATION, pause=PAUSE)
+    gui.click(x=854, y=424, duration=DURATION, pause=PAUSE)
     # Join coaches
     gui.click(x=807, y=484, duration=DURATION, pause=PAUSE)
     # Start game
@@ -56,23 +55,29 @@ def start_game():
 
 
 def restart_game():
+    # Add a full restart here after a certain number of episodes
     prepare_steam_client()
     prepare_dota_client()
 
-    # Slow down the time and restart the game
+    # Enter the restart command
     gui.press('\\', pause=PAUSE)
-    gui.typewrite('host_timescale 6', interval=INTERVAL)
-    gui.press('enter', pause=PAUSE)
     gui.typewrite('restart', interval=INTERVAL)
     gui.press('enter', pause=PAUSE)
     gui.press('\\', pause=PAUSE)
-    time.sleep(12)
 
-    # Start the game timer right away
+    # Wait until the in-game UI is visible
+    cnt = 0
+    while True:
+        point = gui.locateOnScreen('icons/inactive_arrow.png')
+        if point:
+            break
+        cnt += 1
+        if cnt >= 120:
+            restart_game()
+
+    # Start the game right away
     gui.press('\\', pause=PAUSE)
     gui.typewrite('dota_dev forcegamestart', interval=INTERVAL)
-    gui.press('enter')
-    gui.typewrite('host_timescale 10', interval=INTERVAL)
     gui.press('enter')
     gui.press('\\', pause=PAUSE)
 
@@ -107,9 +112,11 @@ def close_dota_client():
     time.sleep(30)
 
 
-def enable_cheats():
+def calibrate_dota_client():
     gui.press('\\', pause=PAUSE)
     gui.typewrite('sv_cheats 1', interval=INTERVAL)
+    gui.press('enter', pause=PAUSE)
+    gui.typewrite('host_timescale 5', interval=INTERVAL)
     gui.press('enter', pause=PAUSE)
     gui.press('\\', pause=PAUSE)
 

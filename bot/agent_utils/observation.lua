@@ -80,7 +80,6 @@ function Observation.get_observation()
         ['hero_info'] = get_hero_info(),
         ['enemy_info'] = get_enemy_info(),
     }
-    print('observation:', Func.dump(observation))
     return observation
 end
 
@@ -116,7 +115,7 @@ function Observation.is_done()
     if GetGameState() == GAME_STATE_POST_GAME or
             GetHeroKills(agent_player_id) > 0 or
             GetHeroDeaths(agent_player_id) > 0 or
-            DotaTime() > (Config.is_in_training_mode and 600 or 120) then
+            DotaTime() > 600 then
         _end = true
         print('Bot: the game has ended.')
     end

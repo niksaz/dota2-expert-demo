@@ -5,6 +5,7 @@ from dotaenv.codes import ATTACK_CREEP
 import pickle
 import argparse
 import os
+import numpy as np
 
 
 def record(filename):
@@ -14,22 +15,31 @@ def record(filename):
     state_action_pairs = []
     done = False
     while not done:
-        state, _, done, info = env.step(action=ATTACK_CREEP)
-        next_pair = (state, info)
-        print(next_pair)
-        state_action_pairs.append(next_pair)
+        pairs = env.step(action=ATTACK_CREEP)
+        for _, (state, _, done, info) in pairs:
+            state_action_pairs.append((state, info))
+    print('Frames recorded:', len(state_action_pairs))
+
+    filtered = []
+    last_state = None
+    for state, info in state_action_pairs:
+        if last_state is not None and np.linalg.norm(last_state - state) == 0:
+            continue
+        last_state = state
+        filtered.append((state, info))
+    print('After filtering:', len(filtered))
 
     with open(filename, 'wb') as output_file:
-        pickle.dump(state_action_pairs, output_file)
+        pickle.dump(filtered, output_file)
 
 
 def print_out(filename):
     with open(filename, 'rb') as input_file:
-        states = pickle.load(input_file)
+        state_action_pairs = pickle.load(input_file)
 
-    for state in states:
-        print(state)
-    print(len(states))
+    for state, info in state_action_pairs:
+        print(state, info)
+    print(len(state_action_pairs))
 
 
 def main():

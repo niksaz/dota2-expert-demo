@@ -247,7 +247,7 @@ def learn(env,
     obs = env.reset()
     obs = StatePreprocessor.process(obs)
     reset = True
-    last_reset_t = 0
+    last_t = 0
 
     reward_shaper = ActionAdviceRewardShaper('replays-action/')
     reward_shaper.load()
@@ -305,33 +305,36 @@ def learn(env,
             action = act(np.array(obs)[None], biases, update_eps=update_eps, **kwargs)[0]
             reset = False
 
-            new_obs, rew, done, _ = env.step(action)
+            pairs = env.step(action)
+            action, (new_obs, rew, done, _) = pairs[-1]
+            episode_rewards[-1] += rew
+            new_obs = StatePreprocessor.process(new_obs)
+
+            # Our observation is the one from the last but one frame
+            if len(pairs) > 1:
+                __, (obs, _, _, _) = pairs[-2]
+                obs = StatePreprocessor.process(obs)
+
+            logger.log('{}/{} obs {} action {}'.format(t, total_timesteps, obs, action))
+
             if len(new_obs) == 0:
-                # Incorrect observation
                 done = True
             else:
-                episode_rewards[-1] += rew
-
-                new_obs = StatePreprocessor.process(new_obs)
-                logger.log('{}/{} obs {} action {}'.format(t, total_timesteps, obs, action))
-
-                # Store transition in the replay buffer.
                 replay_buffer.add(obs, action, rew, new_obs, float(done))
                 obs = new_obs
 
             if done:
                 summary = tf.Summary(value=[tf.Summary.Value(tag="rewards", simple_value=episode_rewards[-1])])
-                summary_writer.add_summary(summary, len(episode_rewards))
+                summary_writer.add_summary(summary, t)
                 summary = tf.Summary(value=[tf.Summary.Value(tag="eps", simple_value=update_eps)])
-                summary_writer.add_summary(summary, len(episode_rewards))
-                summary = tf.Summary(value=[tf.Summary.Value(tag="episode_steps", simple_value=t-last_reset_t)])
-                summary_writer.add_summary(summary, len(episode_rewards))
+                summary_writer.add_summary(summary, t)
+                summary = tf.Summary(value=[tf.Summary.Value(tag="episode_steps", simple_value=t-last_t)])
+                summary_writer.add_summary(summary, t)
 
                 obs = env.reset()
                 obs = StatePreprocessor.process(obs)
                 episode_rewards.append(0.0)
                 reset = True
-                last_reset_t = t
 
             if t > learning_starts and t % train_freq == 0:
                 # Minimize the error in Bellman's equation on a batch sampled from replay buffer.
@@ -347,7 +350,8 @@ def learn(env,
                     obses_t, biases_t, actions, rewards, obses_tp1, biases_tp1, dones, weights)
 
                 # Loss logging
-                summary = tf.Summary(value=[tf.Summary.Value(tag='weighted_error', simple_value=weighted_error)])
+                summary = tf.Summary(
+                    value=[tf.Summary.Value(tag='weighted_error', simple_value=weighted_error)])
                 summary_writer.add_summary(summary, t)
 
                 if prioritized_replay:
@@ -376,10 +380,11 @@ def learn(env,
                 if saved_mean_reward is None or mean_5ep_reward > saved_mean_reward:
                     if print_freq is not None:
                         logger.log("Saving model due to mean reward increase: {} -> {}".format(
-                                   saved_mean_reward, mean_5ep_reward))
+                            saved_mean_reward, mean_5ep_reward))
                     save_variables(model_file)
                     model_saved = True
                     saved_mean_reward = mean_5ep_reward
+
         if model_saved:
             if print_freq is not None:
                 logger.log("Restored model with mean reward: {}".format(saved_mean_reward))

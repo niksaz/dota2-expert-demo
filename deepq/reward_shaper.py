@@ -122,7 +122,13 @@ class ActionAdviceRewardShaper(AbstractRewardShaper):
                 degrees = angle_pi / math.pi * 180
                 action = round(degrees / (360 / MOVE_ACTIONS_TOTAL)) % MOVE_ACTIONS_TOTAL
             demo.append((state, action))
-        return demo
+        filtered = []
+        last_act = None
+        for state, action in demo:
+            if last_act is not None and action != last_act:
+                filtered.append((state, action))
+            last_act = action
+        return filtered
 
     def get_action_potentials(self, states):
         potentials = np.zeros((len(states), ACTIONS_TOTAL), dtype=np.float32)
@@ -143,6 +149,7 @@ def main():
         for (state, action) in demo:
             print(state, action)
             print('action potentials are:', reward_shaper.get_action_potentials([state]))
+        print('Total number is', len(demo))
 
 
 if __name__ == '__main__':
