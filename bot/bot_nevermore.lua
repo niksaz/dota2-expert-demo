@@ -15,7 +15,8 @@ local fsm_state = SEND_OBSERVATION
 
 local wrong_action = 0
 
-local messages = {}
+local last_message = nil
+local message_cnt = 0
 
 --- Executes received action.
 -- @param action_info bot action
@@ -87,15 +88,16 @@ function Think()
         ['done'] = Observation.is_done(),
         ['action_info'] = Observation.get_action_info()
     }
-    table.insert(messages, {current_action, message})
+    last_message = {current_action, message}
+    message_cnt = message_cnt + 1
     current_action = Action.DO_NOTHING
 
     if fsm_state == SEND_OBSERVATION then
         fsm_state = IDLE
-        send_observation_message(messages)
-        print('FRAMES SENT', #messages)
-        messages = {}
-    elseif fsm_state == ACTION_RECEIVED then
+        send_observation_message({last_message})
+        print('FRAMES TOOK', message_cnt)
+        message_cnt = 0
+    elseif fsm_state == ACTION_RECEIVED and message_cnt >= 29 then
         fsm_state = SEND_OBSERVATION
         current_action = action_to_do_next
     elseif fsm_state == IDLE then

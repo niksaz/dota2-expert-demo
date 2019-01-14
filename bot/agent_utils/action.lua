@@ -7,7 +7,7 @@ local agent = GetBot()
 
 Action.DO_NOTHING = 11
 
-local NEARBY_RADIUS = 1500
+local NEARBY_RADIUS = 1600
 
 local wrong_action = 0
 

@@ -16,7 +16,7 @@ local enemy_creeps = {}
 local enemy_heroes = {}
 local enemy_towers = {}
 
-local NEARBY_RADIUS = 1500
+local NEARBY_RADIUS = 1600
 
 function get_hero_info()
     local hero_info = {}

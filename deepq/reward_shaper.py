@@ -124,9 +124,13 @@ class ActionAdviceRewardShaper(AbstractRewardShaper):
             demo.append((state, action))
         filtered = []
         last_act = None
+        cnt = 0
         for state, action in demo:
-            if last_act is not None and action != last_act:
+            if last_act is None or action != last_act or cnt >= 30:
                 filtered.append((state, action))
+                cnt = 0
+            else:
+                cnt += 1
             last_act = action
         return filtered
 

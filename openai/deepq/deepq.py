@@ -311,9 +311,9 @@ def learn(env,
             new_obs = StatePreprocessor.process(new_obs)
 
             # Our observation is the one from the last but one frame
-            if len(pairs) > 1:
-                __, (obs, _, _, _) = pairs[-2]
-                obs = StatePreprocessor.process(obs)
+            # if len(pairs) > 1:
+            #     __, (obs, _, _, _) = pairs[-2]
+            #     obs = StatePreprocessor.process(obs)
 
             logger.log('{}/{} obs {} action {}'.format(t, total_timesteps, obs, action))
 
@@ -335,6 +335,7 @@ def learn(env,
                 obs = StatePreprocessor.process(obs)
                 episode_rewards.append(0.0)
                 reset = True
+                last_t = t
 
             if t > learning_starts and t % train_freq == 0:
                 # Minimize the error in Bellman's equation on a batch sampled from replay buffer.
