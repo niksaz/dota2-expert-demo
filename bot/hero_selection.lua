@@ -7,16 +7,16 @@ function Think()
     if Config.is_in_training_mode then
         if GetTeam() == TEAM_RADIANT then
             print("selecting radiant")
-            SelectHero(2, "npc_dota_hero_sven")
+            SelectHero(2, "npc_dota_hero_nevermore")
             SelectHero(3, "npc_dota_hero_sven")
-            SelectHero(4, "npc_dota_hero_nevermore")
+            SelectHero(4, "npc_dota_hero_sven")
             SelectHero(5, "npc_dota_hero_sven")
             SelectHero(6, "npc_dota_hero_sven")
         elseif GetTeam() == TEAM_DIRE then
             print("selecting dire")
-            SelectHero(7, "npc_dota_hero_sven")
+            SelectHero(7, "npc_dota_hero_lina")
             SelectHero(8, "npc_dota_hero_sven")
-            SelectHero(9, "npc_dota_hero_lina")
+            SelectHero(9, "npc_dota_hero_sven")
             SelectHero(10, "npc_dota_hero_sven")
             SelectHero(11, "npc_dota_hero_sven")
         end
@@ -30,9 +30,9 @@ function Think()
             SelectHero(6, "npc_dota_hero_sven");
         elseif (GetTeam() == TEAM_DIRE) then
             print("selecting dire");
-            SelectHero(7, "npc_dota_hero_sven");
+            SelectHero(7, "npc_dota_hero_lina");
             SelectHero(8, "npc_dota_hero_sven");
-            SelectHero(9, "npc_dota_hero_lina");
+            SelectHero(9, "npc_dota_hero_sven");
             SelectHero(10, "npc_dota_hero_sven");
             SelectHero(11, "npc_dota_hero_sven");
         end
