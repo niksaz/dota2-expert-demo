@@ -8,7 +8,7 @@ local Reward = require(GetScriptDirectory() .. '/agent_utils/reward')
 local Action = require(GetScriptDirectory() .. '/agent_utils/action')
 
 local action_to_do_next
-local current_action = Action.DO_NOTHING
+local current_action = 0
 
 -- Bot communication automaton.
 local IDLE = 0
@@ -91,7 +91,6 @@ function Think()
         ['action_info'] = Observation.get_action_info()
     }
     table.insert(messages, {current_action, message})
-    current_action = Action.DO_NOTHING
 
     if fsm_state == SEND_OBSERVATION then
         fsm_state = IDLE

@@ -5,7 +5,7 @@ local Reward = require(GetScriptDirectory() .. '/agent_utils/reward')
 local Action = require(GetScriptDirectory() .. '/agent_utils/action')
 
 local action_to_do_next
-local current_action = Action.DO_NOTHING
+local current_action = 0
 
 -- Bot communication automaton.
 local IDLE = 0
@@ -83,20 +83,22 @@ function Think()
     -- current state info
     Observation.update_info_about_environment()
     local message = {
-        ['observation'] = Observation.get_observation(),
+        ['observation'] = Observation.get_observation(current_action),
         ['reward'] = Reward.get_reward(wrong_action),
         ['done'] = Observation.is_done(),
         ['action_info'] = Observation.get_action_info()
     }
     last_message = {current_action, message}
     message_cnt = message_cnt + 1
-    current_action = Action.DO_NOTHING
 
     if fsm_state == SEND_OBSERVATION then
         fsm_state = IDLE
         send_observation_message({last_message})
         print('FRAMES TOOK', message_cnt)
         message_cnt = 0
+        if message['done'] == true then
+            DebugPause()
+        end
     elseif fsm_state == ACTION_RECEIVED and message_cnt >= 29 then
         fsm_state = SEND_OBSERVATION
         current_action = action_to_do_next

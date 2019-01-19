@@ -1,15 +1,16 @@
 # Author: Mikita Sazanovich
 
+import json
+import math
 import os
 import pickle
-import numpy as np
-import math
 from abc import ABC, abstractmethod
 
+import numpy as np
+
 from deepq.state_preprocessor import StatePreprocessor
-from dotaenv.codes import ATTACK_CREEP, ATTACK_HERO, ATTACK_TOWER, \
-    SHAPER_STATE_PROJECT, SHAPER_STATE_DIM, STATE_PROJECT, STATE_DIM, \
-    MOVE_ACTIONS_TOTAL, ACTIONS_TOTAL
+from dotaenv.codes import SHAPER_STATE_PROJECT, SHAPER_STATE_DIM, STATE_DIM, \
+    ACTIONS_TOTAL
 
 
 class AbstractRewardShaper(ABC):
@@ -87,52 +88,37 @@ class ActionAdviceRewardShaper(AbstractRewardShaper):
     SIGMA = 0.2 * np.identity(STATE_DIM)
     SIGMA[0][0] = 1.0
     SIGMA[1][1] = 1.0
+    SIGMA[2][2] = 1.0
     K = 10
 
     def __init__(self, replay_dir):
         super(ActionAdviceRewardShaper, self).__init__(replay_dir)
 
     def load(self):
-        super(ActionAdviceRewardShaper, self).load()
-        print('Loaded %d action replays'.format(len(self.demos)))
+        filepath = os.path.join(self.replay_dir, '3839916254_623964743.obs')
+        file = open(filepath, 'r')
+        lines = file.readlines()
+        file.close()
+        demo = self.process_replay(lines)
+        self.demos.append(demo)
+        print('Loaded {} action replays'.format(len(self.demos)))
 
-    def process_replay(self, dumped_replay):
+    def process_replay(self, replay_lines):
+        last_action = 0
         demo = []
-        for (state, info) in dumped_replay:
-            if len(state) == 0:
+        for line in replay_lines:
+            state_action_pair = json.loads(line)
+            state = state_action_pair['state']
+            action = state_action_pair['action']
+            if action > ACTIONS_TOTAL:
                 continue
-            state = state[STATE_PROJECT]
-            state = self.state_preprocessor.process(state)
-
-            if info[2] != -1:  # The target is an enemy creep
-                action = ATTACK_CREEP
-            elif info[3] != -1:  # The target is an enemy hero
-                action = ATTACK_HERO
-            elif info[4] != -1:  # The target is an enemy tower
-                action = ATTACK_TOWER
-            else:
-                # Maybe the agent is moving?
-                diff = np.array(info[:2], dtype=np.float32) - state[:2]
-                if np.linalg.norm(diff) == 0:
-                    # position did not change; skip transition
-                    continue
-                angle_pi = math.atan2(diff[1], diff[0])
-                if angle_pi < 0:
-                    angle_pi += 2 * math.pi
-                degrees = angle_pi / math.pi * 180
-                action = round(degrees / (360 / MOVE_ACTIONS_TOTAL)) % MOVE_ACTIONS_TOTAL
-            demo.append((state, action))
-        filtered = []
-        last_act = None
-        cnt = 0
-        for state, action in demo:
-            if last_act is None or action != last_act or cnt >= 30:
-                filtered.append((state, action))
-                cnt = 0
-            else:
-                cnt += 1
-            last_act = action
-        return filtered
+            vector_state = np.zeros(18, dtype=np.float32)
+            vector_state[0] = last_action / (ACTIONS_TOTAL - 1.0)
+            vector_state[1:12] = state['hero_info']
+            vector_state[12:] = state['enemy_info']
+            demo.append((vector_state, action))
+            last_action = action
+        return demo
 
     def get_action_potentials(self, states):
         potentials = np.zeros((len(states), ACTIONS_TOTAL), dtype=np.float32)
@@ -147,7 +133,7 @@ class ActionAdviceRewardShaper(AbstractRewardShaper):
 
 
 def main():
-    reward_shaper = ActionAdviceRewardShaper('replays-action/')
+    reward_shaper = ActionAdviceRewardShaper('../observations')
     reward_shaper.load()
     for demo in reward_shaper.demos:
         for (state, action) in demo:

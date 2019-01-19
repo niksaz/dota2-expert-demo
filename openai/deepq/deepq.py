@@ -106,7 +106,7 @@ def learn(env,
           train_freq=1,
           batch_size=32,
           print_freq=1,
-          checkpoint_freq=10000,
+          checkpoint_freq=1,
           learning_starts=1000,
           gamma=1.0,
           target_network_update_freq=500,
@@ -242,14 +242,7 @@ def learn(env,
     U.initialize()
     update_target()
 
-    episode_rewards = [0.0]
-    saved_mean_reward = None
-    obs = env.reset()
-    obs = StatePreprocessor.process(obs)
-    reset = True
-    last_t = 0
-
-    reward_shaper = ActionAdviceRewardShaper('replays-action/')
+    reward_shaper = ActionAdviceRewardShaper('../observations')
     reward_shaper.load()
 
     experiment_dir = os.path.join('experiments', experiment_name)
@@ -272,6 +265,7 @@ def learn(env,
             os.makedirs(td)
         model_file = os.path.join(td, "best_model")
         model_saved = False
+        saved_mean_reward = None
 
         if os.path.exists(model_file):
             print('Model is loading')
@@ -282,98 +276,70 @@ def learn(env,
             load_variables(load_path)
             logger.log('Loaded model from {}'.format(load_path))
 
-        for t in range(total_timesteps):
-            if callback is not None:
-                if callback(locals(), globals()):
-                    break
-            # Take action and update exploration to the newest value
-            kwargs = {}
-            if not param_noise:
-                update_eps = exploration.value(t)
-                update_param_noise_threshold = 0.
-            else:
-                update_eps = 0.
-                # Compute the threshold such that the KL divergence between perturbed and non-perturbed
-                # policy is comparable to eps-greedy exploration with eps = exploration.value(t).
-                # See Appendix C.1 in Parameter Space Noise for Exploration, Plappert et al., 2017
-                # for detailed explanation.
-                update_param_noise_threshold = -np.log(1. - exploration.value(t) + exploration.value(t) / float(env.action_space.n))
-                kwargs['reset'] = reset
-                kwargs['update_param_noise_threshold'] = update_param_noise_threshold
-                kwargs['update_param_noise_scale'] = True
-            biases = reward_shaper.get_action_potentials([obs])
-            action = act(np.array(obs)[None], biases, update_eps=update_eps, **kwargs)[0]
-            reset = False
-
-            pairs = env.step(action)
-            action, (new_obs, rew, done, _) = pairs[-1]
-            episode_rewards[-1] += rew
-            new_obs = StatePreprocessor.process(new_obs)
-
-            # Our observation is the one from the last but one frame
-            # if len(pairs) > 1:
-            #     __, (obs, _, _, _) = pairs[-2]
-            #     obs = StatePreprocessor.process(obs)
-
-            logger.log('{}/{} obs {} action {}'.format(t, total_timesteps, obs, action))
-
-            if len(new_obs) == 0:
-                done = True
-            else:
-                replay_buffer.add(obs, action, rew, new_obs, float(done))
-                obs = new_obs
-
-            if done:
-                summary = tf.Summary(value=[tf.Summary.Value(tag="rewards", simple_value=episode_rewards[-1])])
-                summary_writer.add_summary(summary, t)
-                summary = tf.Summary(value=[tf.Summary.Value(tag="eps", simple_value=update_eps)])
-                summary_writer.add_summary(summary, t)
-                summary = tf.Summary(value=[tf.Summary.Value(tag="episode_steps", simple_value=t-last_t)])
-                summary_writer.add_summary(summary, t)
-
-                obs = env.reset()
-                obs = StatePreprocessor.process(obs)
-                episode_rewards.append(0.0)
-                reset = True
-                last_t = t
-
-            if t > learning_starts and t % train_freq == 0:
-                # Minimize the error in Bellman's equation on a batch sampled from replay buffer.
-                if prioritized_replay:
-                    experience = replay_buffer.sample(batch_size, beta=beta_schedule.value(t))
-                    (obses_t, actions, rewards, obses_tp1, dones, weights, batch_idxes) = experience
+        episode_rewards = []
+        update_step_t = 0
+        while update_step_t < total_timesteps:
+            # Reset the environment
+            obs = env.reset()
+            obs = StatePreprocessor.process(obs)
+            episode_rewards.append(0.0)
+            reset = True
+            done = False
+            # Sample the episode until it is completed
+            act_step_t = update_step_t
+            while not done:
+                if callback is not None:
+                    if callback(locals(), globals()):
+                        break
+                # Take action and update exploration to the newest value
+                kwargs = {}
+                if not param_noise:
+                    update_eps = exploration.value(act_step_t)
+                    update_param_noise_threshold = 0.
                 else:
-                    obses_t, actions, rewards, obses_tp1, dones = replay_buffer.sample(batch_size)
-                    weights, batch_idxes = np.ones_like(rewards), None
-                biases_t = reward_shaper.get_action_potentials(obses_t)
-                biases_tp1 = reward_shaper.get_action_potentials(obses_tp1)
-                td_errors, weighted_error = train(
-                    obses_t, biases_t, actions, rewards, obses_tp1, biases_tp1, dones, weights)
+                    update_eps = 0.
+                    # Compute the threshold such that the KL divergence between perturbed and non-perturbed
+                    # policy is comparable to eps-greedy exploration with eps = exploration.value(act_step_t).
+                    # See Appendix C.1 in Parameter Space Noise for Exploration, Plappert et al., 2017
+                    # for detailed explanation.
+                    update_param_noise_threshold = -np.log(
+                        1. - exploration.value(act_step_t) +
+                        exploration.value(act_step_t) / float(env.action_space.n))
+                    kwargs['reset'] = reset
+                    kwargs['update_param_noise_threshold'] = update_param_noise_threshold
+                    kwargs['update_param_noise_scale'] = True
+                biases = reward_shaper.get_action_potentials([obs])
+                action = act(np.array(obs)[None], biases, update_eps=update_eps, **kwargs)[0]
+                reset = False
 
-                # Loss logging
-                summary = tf.Summary(
-                    value=[tf.Summary.Value(tag='weighted_error', simple_value=weighted_error)])
-                summary_writer.add_summary(summary, t)
+                pairs = env.step(action)
+                action, (new_obs, rew, done, _) = pairs[-1]
+                episode_rewards[-1] += rew
+                new_obs = StatePreprocessor.process(new_obs)
 
-                if prioritized_replay:
-                    new_priorities = np.abs(td_errors) + prioritized_replay_eps
-                    replay_buffer.update_priorities(batch_idxes, new_priorities)
-
-            if t > learning_starts and t % target_network_update_freq == 0:
-                # Update target network periodically.
-                update_target()
-
-            mean_5ep_reward = round(np.mean(episode_rewards[-6:-1]), 1)
+                logger.log('{}/{} obs {} action {}'.format(act_step_t, total_timesteps, obs, action))
+                act_step_t += 1
+                if len(new_obs) == 0:
+                    done = True
+                else:
+                    replay_buffer.add(obs, action, rew, new_obs, float(done))
+                    obs = new_obs
+            # Post episode logging
+            summary = tf.Summary(value=[tf.Summary.Value(tag="rewards", simple_value=episode_rewards[-1])])
+            summary_writer.add_summary(summary, act_step_t)
+            summary = tf.Summary(value=[tf.Summary.Value(tag="eps", simple_value=update_eps)])
+            summary_writer.add_summary(summary, act_step_t)
+            summary = tf.Summary(value=[tf.Summary.Value(tag="episode_steps", simple_value=act_step_t-update_step_t)])
+            summary_writer.add_summary(summary, act_step_t)
+            mean_5ep_reward = round(np.mean(episode_rewards[-5:]), 1)
             num_episodes = len(episode_rewards)
-            if done and print_freq is not None and len(episode_rewards) % print_freq == 0:
-                logger.record_tabular("steps", t)
+            if print_freq is not None and num_episodes % print_freq == 0:
+                logger.record_tabular("steps", act_step_t)
                 logger.record_tabular("episodes", num_episodes)
                 logger.record_tabular("mean 5 episode reward", mean_5ep_reward)
-                logger.record_tabular("% time spent exploring", int(100 * exploration.value(t)))
+                logger.record_tabular("% time spent exploring", int(100 * exploration.value(act_step_t)))
                 logger.dump_tabular()
-
-            if (checkpoint_freq is not None and t > learning_starts and
-                    num_episodes > 5 and t % checkpoint_freq == 0):
+            if checkpoint_freq is not None and num_episodes % checkpoint_freq == 0:
                 # Periodically save the model
                 rec_model_file = os.path.join(td, "model_{}_{:.2f}".format(num_episodes, mean_5ep_reward))
                 save_variables(rec_model_file)
@@ -385,6 +351,33 @@ def learn(env,
                     save_variables(model_file)
                     model_saved = True
                     saved_mean_reward = mean_5ep_reward
+            # Do the learning
+            while update_step_t < min(act_step_t, total_timesteps):
+                if update_step_t % train_freq == 0:
+                    # Minimize the error in Bellman's equation on a batch sampled from replay buffer.
+                    if prioritized_replay:
+                        experience = replay_buffer.sample(batch_size, beta=beta_schedule.value(update_step_t))
+                        (obses_t, actions, rewards, obses_tp1, dones, weights, batch_idxes) = experience
+                    else:
+                        obses_t, actions, rewards, obses_tp1, dones = replay_buffer.sample(batch_size)
+                        weights, batch_idxes = np.ones_like(rewards), None
+                    biases_t = reward_shaper.get_action_potentials(obses_t)
+                    biases_tp1 = reward_shaper.get_action_potentials(obses_tp1)
+                    td_errors, weighted_error = train(
+                        obses_t, biases_t, actions, rewards, obses_tp1, biases_tp1, dones, weights)
+
+                    # Loss logging
+                    summary = tf.Summary(
+                        value=[tf.Summary.Value(tag='weighted_error', simple_value=weighted_error)])
+                    summary_writer.add_summary(summary, update_step_t)
+
+                    if prioritized_replay:
+                        new_priorities = np.abs(td_errors) + prioritized_replay_eps
+                        replay_buffer.update_priorities(batch_idxes, new_priorities)
+                if update_step_t % target_network_update_freq == 0:
+                    # Update target network periodically.
+                    update_target()
+                update_step_t += 1
 
         if model_saved:
             if print_freq is not None:

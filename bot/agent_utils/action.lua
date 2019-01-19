@@ -5,7 +5,7 @@ local Action = {}
 local Resolver = require(GetScriptDirectory() .. '/agent_utils/resolver')
 local agent = GetBot()
 
-Action.DO_NOTHING = 11
+Action.TOTAL_ACTIONS = 11
 
 local NEARBY_RADIUS = 1600
 

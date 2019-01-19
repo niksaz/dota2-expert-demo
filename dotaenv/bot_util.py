@@ -27,6 +27,7 @@ def message_to_pairs(messages):
 
 def vectorize_observation(observation):
     result = []
+    result.append(observation['action_info'])
     result.extend(observation['hero_info'])
     result.extend(observation['enemy_info'])
     return np.array(result, dtype=np.float32)[STATE_PROJECT]

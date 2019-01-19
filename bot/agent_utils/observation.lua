@@ -5,6 +5,7 @@ local Observation = {}
 local MAX_ABS_X = 8288.0
 local MAX_ABS_Y = 8288.0
 
+local Action = require(GetScriptDirectory() .. '/agent_utils/action')
 local Resolver = require(GetScriptDirectory() .. '/agent_utils/resolver')
 local Func = require(GetScriptDirectory() .. '/util/func')
 local Config = require(GetScriptDirectory() .. '/config')
@@ -75,8 +76,9 @@ function Observation.update_info_about_environment()
 end
 
 -- Get all observations.
-function Observation.get_observation()
+function Observation.get_observation(action)
     local observation = {
+        ['action_info'] = action / (Action.TOTAL_ACTIONS - 1),
         ['hero_info'] = get_hero_info(),
         ['enemy_info'] = get_enemy_info(),
     }
