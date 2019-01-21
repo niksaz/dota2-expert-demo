@@ -82,8 +82,7 @@ function send_observation_message(msg)
 end
 
 function Think()
-    local reward = Reward.get_reward(wrong_action)
-    total_reward = total_reward + reward
+    total_reward = total_reward + Reward.get_reward(wrong_action)
     frame_count = frame_count + 1
     -- Decide on what to do next based on the state
     if fsm_state == SEND_OBSERVATION then
@@ -93,7 +92,7 @@ function Think()
         message = {
             current_action, {
                 ['observation'] = observation,
-                ['reward'] = reward,
+                ['reward'] = total_reward,
                 ['done'] = done,
             }
         }
