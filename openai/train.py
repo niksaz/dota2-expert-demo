@@ -54,7 +54,6 @@ def train(args, extra_args):
         batch_size=32,
         prioritized_replay=True,
         prioritized_replay_alpha=0.6,
-        checkpoint_freq=10000,
         experiment_name=args.exp_name,
         dueling=True
     )

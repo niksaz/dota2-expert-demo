@@ -16,8 +16,7 @@ def message_to_pairs(messages):
             observation = vectorize_observation(observation_message['observation'])
             reward = observation_message['reward']
             done = observation_message['done']
-            action_info = vectorize_action_info(observation_message['action_info'])
-            pairs.append((action, (observation, reward, done, action_info)))
+            pairs.append((action, (observation, reward, done, [])))
             if done:
                 break
     else:
@@ -31,7 +30,3 @@ def vectorize_observation(observation):
     result.extend(observation['hero_info'])
     result.extend(observation['enemy_info'])
     return np.array(result, dtype=np.float32)[STATE_PROJECT]
-
-
-def vectorize_action_info(action_info):
-    return np.array(action_info, dtype=np.float32)

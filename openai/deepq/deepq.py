@@ -117,7 +117,7 @@ def learn(env,
           prioritized_replay_eps=1e-6,
           param_noise=False,
           callback=None,
-          experiment_name='trial',
+          experiment_name='unnamed',
           load_path=None,
           **network_kwargs
           ):
@@ -242,7 +242,7 @@ def learn(env,
     U.initialize()
     update_target()
 
-    reward_shaper = ActionAdviceRewardShaper('../observations')
+    reward_shaper = ActionAdviceRewardShaper('../completed-observations')
     reward_shaper.load()
 
     experiment_dir = os.path.join('experiments', experiment_name)
