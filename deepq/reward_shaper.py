@@ -101,7 +101,7 @@ class ActionAdviceRewardShaper(AbstractRewardShaper):
         file.close()
         demo = self.process_replay(lines)
         self.demos.append(demo)
-        print('Loaded {} action replays'.format(len(self.demos)))
+        print('Loaded state-action demo from {}. Its length is {}'.format(filepath, len(demo)))
 
     def process_replay(self, replay_lines):
         last_action = 0
@@ -110,7 +110,7 @@ class ActionAdviceRewardShaper(AbstractRewardShaper):
             state_action_pair = json.loads(line)
             state = state_action_pair['state']
             action = state_action_pair['action']
-            if action > ACTIONS_TOTAL:
+            if action >= ACTIONS_TOTAL:
                 continue
             vector_state = np.zeros(18, dtype=np.float32)
             vector_state[0] = last_action / (ACTIONS_TOTAL - 1.0)
@@ -123,23 +123,22 @@ class ActionAdviceRewardShaper(AbstractRewardShaper):
     def get_action_potentials(self, states):
         potentials = np.zeros((len(states), ACTIONS_TOTAL), dtype=np.float32)
         for idx, state in enumerate(states):
-            for demo in self.demos:
-                for demo_state, demo_action in demo:
-                    diff = state - demo_state
-                    value = ActionAdviceRewardShaper.K * \
-                            math.e ** (-1 / 2 * diff.dot(ActionAdviceRewardShaper.SIGMA).dot(diff))
-                    potentials[idx][demo_action] = max(potentials[idx][demo_action], value)
+            demo = self.demos[0]
+            for demo_state, demo_action in demo:
+                diff = state - demo_state
+                value = ActionAdviceRewardShaper.K * \
+                        math.e ** (-1 / 2 * diff.dot(ActionAdviceRewardShaper.SIGMA).dot(diff))
+                potentials[idx][demo_action] = max(potentials[idx][demo_action], value)
         return potentials
 
 
 def main():
-    reward_shaper = ActionAdviceRewardShaper('../observations')
+    reward_shaper = ActionAdviceRewardShaper('../completed-observations')
     reward_shaper.load()
     for demo in reward_shaper.demos:
         for (state, action) in demo:
             print(state, action)
             print('action potentials are:', reward_shaper.get_action_potentials([state]))
-        print('Total number is', len(demo))
 
 
 if __name__ == '__main__':
