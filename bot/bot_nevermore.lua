@@ -5,7 +5,7 @@ local Reward = require(GetScriptDirectory() .. '/agent_utils/reward')
 local Action = require(GetScriptDirectory() .. '/agent_utils/action')
 
 -- How many frames should pass before a new observation is sent
-local MIN_FRAMES_BETWEEN = 30
+local MIN_FRAMES_BETWEEN = 1
 
 local frame_count = 0
 local total_reward = 0
