@@ -64,7 +64,7 @@ end
 -- @param creep_idx index of creep in nearby creeps table.
 --
 function attack_creep(creep_idx)
-    local enemy_creeps = agent:GetNearbyCreeps(NEARBY_RADIUS, true)
+    local enemy_creeps = agent:GetNearbyLaneCreeps(NEARBY_RADIUS, true)
     if #enemy_creeps >= creep_idx then
         agent:Action_AttackUnit(enemy_creeps[creep_idx], false)
     else
