@@ -41,14 +41,13 @@ def train(args, extra_args):
 
     alg_kwargs = dict(
         network=models.mlp(num_hidden=128, num_layers=1),
-        lr=1e-4,
+        lr=1e-3,
         buffer_size=10000,
         total_timesteps=500000,
         exploration_fraction=1.0,
         exploration_initial_eps=0.1,
         exploration_final_eps=0.1,
         train_freq=4,
-        learning_starts=1000,
         target_network_update_freq=1000,
         gamma=0.999,
         batch_size=32,
