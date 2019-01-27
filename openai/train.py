@@ -69,11 +69,14 @@ def train(args, extra_args):
 
     print('Training {} on {}:{} with arguments \n{}'.format(args.alg, env_type, env_id, alg_kwargs))
 
-    model = learn(
-        env=env,
-        seed=seed,
-        **alg_kwargs
-    )
+    pool_size = multiprocessing.cpu_count()
+    with multiprocessing.Pool(processes=pool_size) as pool:
+        model = learn(
+            env=env,
+            seed=seed,
+            pool=pool,
+            **alg_kwargs
+        )
 
     return model, env
 
