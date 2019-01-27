@@ -95,13 +95,15 @@ class ActionAdviceRewardShaper(AbstractRewardShaper):
         super(ActionAdviceRewardShaper, self).__init__(replay_dir)
 
     def load(self):
-        filepath = os.path.join(self.replay_dir, '3839916254_623964743.obs')
-        file = open(filepath, 'r')
-        lines = file.readlines()
-        file.close()
-        demo = self.process_replay(lines)
-        self.demos.append(demo)
-        print('Loaded state-action demo from {}. Its length is {}'.format(filepath, len(demo)))
+        filenames = ['3839916254_623964743.obs', '3840956427_275462981.obs']
+        for filename in filenames:
+            filepath = os.path.join(self.replay_dir, filename)
+            file = open(filepath, 'r')
+            lines = file.readlines()
+            file.close()
+            demo = self.process_replay(lines)
+            self.demos.append(demo)
+            print('Loaded state-action demo from {}. Its length is {}'.format(filepath, len(demo)))
 
     def process_replay(self, replay_lines):
         last_action = 0
@@ -122,12 +124,12 @@ class ActionAdviceRewardShaper(AbstractRewardShaper):
 
     def get_action_potentials(self, state):
         potentials = np.zeros(ACTIONS_TOTAL, dtype=np.float32)
-        demo = self.demos[0]
-        for demo_state, demo_action in demo:
-            diff = state - demo_state
-            value = ActionAdviceRewardShaper.K * \
-                    math.e ** (-1 / 2 * diff.dot(ActionAdviceRewardShaper.SIGMA).dot(diff))
-            potentials[demo_action] = max(potentials[demo_action], value)
+        for demo in self.demos:
+            for demo_state, demo_action in demo:
+                diff = state - demo_state
+                value = ActionAdviceRewardShaper.K * \
+                        math.e ** (-1 / 2 * diff.dot(ActionAdviceRewardShaper.SIGMA).dot(diff))
+                potentials[demo_action] = max(potentials[demo_action], value)
         return potentials
 
 
