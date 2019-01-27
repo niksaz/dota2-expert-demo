@@ -77,7 +77,7 @@ def restart_game():
 
     # Start the game right away
     gui.press('\\', pause=PAUSE)
-    gui.typewrite('dota_dev forcegamestart', interval=INTERVAL)
+    gui.typewrite('dota_start_game', interval=INTERVAL)
     gui.press('enter')
     gui.press('\\', pause=PAUSE)
 
