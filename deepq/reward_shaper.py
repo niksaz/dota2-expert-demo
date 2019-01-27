@@ -120,15 +120,14 @@ class ActionAdviceRewardShaper(AbstractRewardShaper):
             last_action = action
         return demo
 
-    def get_action_potentials(self, states):
-        potentials = np.zeros((len(states), ACTIONS_TOTAL), dtype=np.float32)
-        for idx, state in enumerate(states):
-            demo = self.demos[0]
-            for demo_state, demo_action in demo:
-                diff = state - demo_state
-                value = ActionAdviceRewardShaper.K * \
-                        math.e ** (-1 / 2 * diff.dot(ActionAdviceRewardShaper.SIGMA).dot(diff))
-                potentials[idx][demo_action] = max(potentials[idx][demo_action], value)
+    def get_action_potentials(self, state):
+        potentials = np.zeros(ACTIONS_TOTAL, dtype=np.float32)
+        demo = self.demos[0]
+        for demo_state, demo_action in demo:
+            diff = state - demo_state
+            value = ActionAdviceRewardShaper.K * \
+                    math.e ** (-1 / 2 * diff.dot(ActionAdviceRewardShaper.SIGMA).dot(diff))
+            potentials[demo_action] = max(potentials[demo_action], value)
         return potentials
 
 
@@ -138,7 +137,7 @@ def main():
     for demo in reward_shaper.demos:
         for (state, action) in demo:
             print(state, action)
-            print('action potentials are:', reward_shaper.get_action_potentials([state]))
+            print('action potentials are:', reward_shaper.get_action_potentials(state))
 
 
 if __name__ == '__main__':

@@ -1,4 +1,5 @@
 import os
+import time
 import tempfile
 
 import tensorflow as tf
@@ -97,6 +98,7 @@ def load_act(path):
 def learn(env,
           network,
           seed=None,
+          pool=None,
           lr=5e-4,
           total_timesteps=100000,
           buffer_size=50000,
@@ -308,7 +310,7 @@ def learn(env,
                     kwargs['reset'] = reset
                     kwargs['update_param_noise_threshold'] = update_param_noise_threshold
                     kwargs['update_param_noise_scale'] = True
-                biases = reward_shaper.get_action_potentials([obs])
+                biases = reward_shaper.get_action_potentials(obs)
                 action = act(np.array(obs)[None], biases, update_eps=update_eps, **kwargs)[0]
                 reset = False
 
@@ -352,6 +354,7 @@ def learn(env,
                     model_saved = True
                     saved_mean_reward = mean_5ep_reward
             # Do the learning
+            start = time.time()
             while update_step_t < min(act_step_t, total_timesteps):
                 if update_step_t % train_freq == 0:
                     # Minimize the error in Bellman's equation on a batch sampled from replay buffer.
@@ -361,8 +364,8 @@ def learn(env,
                     else:
                         obses_t, actions, rewards, obses_tp1, dones = replay_buffer.sample(batch_size)
                         weights, batch_idxes = np.ones_like(rewards), None
-                    biases_t = reward_shaper.get_action_potentials(obses_t)
-                    biases_tp1 = reward_shaper.get_action_potentials(obses_tp1)
+                    biases_t = pool.map(reward_shaper.get_action_potentials, obses_t)
+                    biases_tp1 = pool.map(reward_shaper.get_action_potentials, obses_tp1)
                     td_errors, weighted_error = train(
                         obses_t, biases_t, actions, rewards, obses_tp1, biases_tp1, dones, weights)
 
@@ -378,6 +381,8 @@ def learn(env,
                     # Update target network periodically.
                     update_target()
                 update_step_t += 1
+            stop = time.time()
+            logger.log("Learning took {:.2f} seconds".format(stop - start))
 
         if model_saved:
             if print_freq is not None:
