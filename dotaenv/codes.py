@@ -1,9 +1,18 @@
 # Author: Mikita Sazanovich
 
-STATE_PROJECT = [0, 1] #, 11, 12, 19, 20]
+STATE_PROJECT = range(18)
 STATE_DIM = len(STATE_PROJECT)
+SHAPER_STATE_PROJECT = range(2)
+SHAPER_STATE_DIM = len(SHAPER_STATE_PROJECT)
 
-MOVES_TOTAL = 20
-ATTACK_CREEP = MOVES_TOTAL
-ATTACK_HERO = MOVES_TOTAL + 1
-ATTACK_TOWER = MOVES_TOTAL + 2
+# First actions are movement actions towards (360 / total * action_number)°
+MOVE_ACTIONS_TOTAL = 8
+# Action to attack the nearest creep
+ATTACK_CREEP = MOVE_ACTIONS_TOTAL
+# Action to attack the enemy hero
+ATTACK_HERO = ATTACK_CREEP + 1
+# Action to attack the enemy middle tower
+ATTACK_TOWER = ATTACK_HERO + 1
+
+# The last action does nothing
+ACTIONS_TOTAL = MOVE_ACTIONS_TOTAL + 3

@@ -8,15 +8,15 @@ from sklearn.preprocessing import OneHotEncoder
 from policy_gradient.analyze_model import print_network_weights
 from policy_gradient.network import Network
 from policy_gradient.replay_buffer import ReplayBuffer
-from dotaenv.codes import STATE_DIM, MOVES_TOTAL
-from deepq.replay_reward_shaper import ReplayRewardShaper
+from dotaenv.codes import STATE_DIM, ACTIONS_TOTAL
+from deepq.reward_shaper import StatePotentialRewardShaper
 from deepq.state_preprocessor import StatePreprocessor
 
 logger = logging.getLogger('DotaRL.PGAgent')
 logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 
 input_shape = STATE_DIM
-output_shape = MOVES_TOTAL
+output_shape = ACTIONS_TOTAL
 
 
 class PGAgent:
@@ -64,7 +64,7 @@ class PGAgent:
                                      eps=self.eps))
 
     def train(self):
-        reward_shaper = ReplayRewardShaper('../replays/')
+        reward_shaper = StatePotentialRewardShaper('replays/')
         reward_shaper.load()
 
         episode_rewards = []
@@ -127,7 +127,7 @@ class PGAgent:
             states.append(state)
             action = self.get_action(state=state, eps=eps)
             actions.append(action)
-            state, terminal_action, reward = self.env.execute(action=action)
+            state, reward, terminal_action, _ = self.env.step(action=action)
             state = StatePreprocessor.process(state)
             next_states.append(state)
             rewards.append(reward)

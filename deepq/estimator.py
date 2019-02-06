@@ -7,6 +7,7 @@ import tensorflow as tf
 class Estimator:
     """Q-Value estimation neural network.
 
+    Employs Dueling Network Architecture (https://arxiv.org/pdf/1511.06581.pdf).
     Used for both Q-Value estimation and the target network.
     """
 
@@ -34,15 +35,21 @@ class Estimator:
         self.Y = tf.placeholder(shape=[None], dtype=tf.float32, name="Y")
         # Selected action index
         self.action_ind = tf.placeholder(shape=[None], dtype=tf.int32, name="actions")
+        # Gradients' importance weights
+        self.weights = tf.placeholder(shape=[None], dtype=tf.float32, name="weights")
 
         layer_shape = 20
 
         # Network
         fc1 = tf.layers.dense(inputs=self.X, units=layer_shape, activation=tf.nn.relu)
         fc2 = tf.layers.dense(inputs=fc1, units=layer_shape, activation=tf.nn.relu)
-        fc3 = tf.layers.dense(inputs=fc2, units=action_space, activation=None)
 
-        self.predictions = fc3
+        # State values
+        fc3s = tf.layers.dense(inputs=fc2, units=1, activation=None)
+        # Advantage values
+        fc3a = tf.layers.dense(inputs=fc2, units=action_space, activation=None)
+
+        self.predictions = fc3s + (fc3a - tf.reduce_mean(fc3a, reduction_indices=[1, ], keep_dims=True))
 
         # Get the predictions for the chosen actions only
         batch_size = tf.shape(self.X)[0]
@@ -51,7 +58,7 @@ class Estimator:
 
         # Calculate the loss
         self.losses = tf.squared_difference(self.Y, self.action_predictions)
-        self.loss = tf.reduce_mean(self.losses)
+        self.loss = tf.losses.compute_weighted_loss(self.losses, self.weights)
 
         # Optimizer parameters are taken from DQN paper (V. Mnih 2015)
         self.optimizer = tf.train.RMSPropOptimizer(
@@ -73,8 +80,8 @@ class Estimator:
         feed_dict = {self.X: X}
         return sess.run(self.predictions, feed_dict=feed_dict)
 
-    def update(self, sess, X, actions, targets):
-        feed_dict = {self.X: X, self.Y: targets, self.action_ind: actions}
+    def update(self, sess, X, actions, targets, weights):
+        feed_dict = {self.X: X, self.Y: targets, self.action_ind: actions, self.weights: weights}
         summaries, global_step, predictions, _ = sess.run(
             [self.summaries, tf.train.get_global_step(), self.action_predictions, self.train_op],
             feed_dict)

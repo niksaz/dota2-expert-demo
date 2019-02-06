@@ -1,50 +1,56 @@
-from tensorforce.environments import Environment
+import gym
+from gym import spaces
+import logging.config
+import numpy as np
 
 import dotaenv.bot_server as server
 import dotaenv.dota_runner as runner
-from dotaenv.codes import STATE_DIM, MOVES_TOTAL
+from dotaenv.codes import STATE_DIM, ACTIONS_TOTAL
 
 
-class DotaEnvironment(Environment):
+RESTART_AFTER_EPISODES = 100
+
+
+class DotaEnvironment(gym.Env):
 
     def __init__(self):
-        self.action_space = (MOVES_TOTAL,)
-        self.observation_space = (STATE_DIM,)
-        self.terminal = False
-        self.restarts = 0
+        self.__version__ = "0.1.0"
+        logging.info("DotaEnvironment-{}".format(self.__version__))
+
+        self.action_space = spaces.Discrete(ACTIONS_TOTAL)
+
+        low = np.zeros(STATE_DIM, dtype=np.float32)
+        low[0] = -1.0  # For x coordinate
+        low[1] = -1.0  # For y coordinate
+        high = np.ones(STATE_DIM, dtype=np.float32)
+        self.observation_space = spaces.Box(low, high, dtype=np.float32)
+
+        self.episodes_experienced = 0
         server.run_app()
-        runner.make_sure_dota_is_launched()
-        runner.set_timescale()
-        runner.start_game()
+
+    def step(self, action):
+        return server.step(action=action)
 
     def reset(self):
-        runner._bring_into_focus()
-        if self.restarts > 10:
-            self.restarts = 0
-            runner.close_game()
-            runner.make_sure_dota_is_launched()
-            runner.set_timescale()
-            runner.start_game()
-        else:
-            self.restarts += 1
-            runner.restart_game()
-        return server.get_observation()[0]
+        server.reset()
+        self.episodes_experienced += 1
+        if self.episodes_experienced > RESTART_AFTER_EPISODES:
+            self.episodes_experienced = 0
+            self.close()
+        runner.restart_game()
+        observation, _, _, _ = server.get_observation_pairs()[-1][1]  # Second element of the last pair
+        # Sometimes the Dota 2 client takes more time than planned and then
+        # we need to reset it once again
+        return observation if len(observation) != 0 else self.reset()
 
-    def execute(self, action):
-        state, reward, terminal = server.step(action=action)
-        self.terminal = terminal
-        return state, reward, terminal
+    def render(self, mode='human'):
+        # It is rendered in the Dota 2 client
+        return
 
     def close(self):
-        runner.close_game()
+        runner.close_dota_client()
+        runner.close_steam_client()
 
-    def __str__(self):
-        return 'Dota 2 Environment'
-
-    @property
-    def states(self):
-        return dict(type='float', shape=self.observation_space)
-
-    @property
-    def actions(self):
-        return dict(type='int', num_actions=self.action_space[0])
+    def seed(self, seed=None):
+        # Can not seed DotaEnvironment as it communicates with the Dota 2 client
+        return

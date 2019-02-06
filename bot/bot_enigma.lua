@@ -1,16 +1,14 @@
+-- Copy of the bot_nevermore.lua. It is used in the recording mode and
+-- Dota 2 client requires the files to have this structure.
+
 require(GetScriptDirectory() .. '/util/json')
 
 local Observation = require(GetScriptDirectory() .. '/agent_utils/observation')
 local Reward = require(GetScriptDirectory() .. '/agent_utils/reward')
 local Action = require(GetScriptDirectory() .. '/agent_utils/action')
 
--- How many frames should pass before a new observation is sent
-local MIN_FRAMES_BETWEEN = 1
-
-local frame_count = 0
-local total_reward = 0
-local current_action = 0
 local action_to_do_next
+local current_action = 0
 
 -- Bot communication automaton.
 local IDLE = 0
@@ -19,6 +17,8 @@ local SEND_OBSERVATION = 2
 local fsm_state = SEND_OBSERVATION
 
 local wrong_action = 0
+
+local messages = {}
 
 --- Executes received action.
 -- @param action_info bot action
@@ -82,32 +82,27 @@ function send_observation_message(msg)
 end
 
 function Think()
-    total_reward = total_reward + Reward.get_reward(wrong_action)
-    frame_count = frame_count + 1
-    -- Decide on what to do next based on the state
+    -- current state info
+    Observation.update_info_about_environment()
+    local message = {
+        ['observation'] = Observation.get_observation(),
+        ['reward'] = Reward.get_reward(wrong_action),
+        ['done'] = Observation.is_done(),
+        ['action_info'] = Observation.get_action_info()
+    }
+    table.insert(messages, {current_action, message})
+
     if fsm_state == SEND_OBSERVATION then
         fsm_state = IDLE
-        local observation = Observation.get_observation(current_action)
-        local done = Observation.is_done()
-        message = {
-            current_action, {
-                ['observation'] = observation,
-                ['reward'] = total_reward,
-                ['done'] = done,
-            }
-        }
-        send_observation_message({message})
-        print('FRAME COUNT', frame_count)
-        frame_count = 0
-        if done then
-            DebugPause()
-        end
-    elseif fsm_state == ACTION_RECEIVED and frame_count + 1 >= MIN_FRAMES_BETWEEN then
+        send_observation_message(messages)
+        print('FRAMES SENT', #messages)
+        messages = {}
+    elseif fsm_state == ACTION_RECEIVED then
         fsm_state = SEND_OBSERVATION
         current_action = action_to_do_next
     elseif fsm_state == IDLE then
         -- Do nothing
     end
-    -- Act
+
     execute_action(current_action)
 end

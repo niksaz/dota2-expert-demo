@@ -1,16 +1,10 @@
-Reward = {}
+-- Reward distribution module.
 
-local bot = GetBot()
+local Reward = {}
 
-local enemy_tower = GetTower(TEAM_DIRE, TOWER_MID_1);
-local ally_tower = GetTower(TEAM_RADIANT, TOWER_MID_1);
-if GetTeam() == TEAM_DIRE then
-    local temp = ally_tower
-    ally_tower = enemy_tower
-    enemy_tower = temp
-end
+local agent = GetBot()
 
-local this_player_id = bot:GetPlayerID()
+local agent_player_id = agent:GetPlayerID()
 
 local last_enemy_tower_health = 1300
 local last_ally_tower_health = 1300
@@ -41,7 +35,7 @@ function get_enemy()
 end
 
 function get_my_health()
-    return bot:GetHealth()
+    return agent:GetHealth()
 end
 
 function get_enemy_health()
@@ -75,19 +69,19 @@ function get_ally_tower_health()
 end
 
 function get_my_kills()
-    return GetHeroKills(this_player_id)
+    return GetHeroKills(agent_player_id)
 end
 
 function get_my_deaths()
-    return GetHeroDeaths(this_player_id)
+    return GetHeroDeaths(agent_player_id)
 end
 
 function get_distance_to_tower_punishment()
-    return GetUnitToUnitDistance(bot, ally_tower) + GetUnitToUnitDistance(bot, enemy_tower)
+    return GetUnitToUnitDistance(agent, ally_tower) + GetUnitToUnitDistance(agent, enemy_tower)
 end
 
 function get_last_hits()
-    return bot:GetLastHits()
+    return agent:GetLastHits()
 end
 
 function recently_damaged_enemy()
@@ -100,20 +94,23 @@ function recently_damaged_enemy()
     return result
 end
 
-function is_near_ally_tower()
-    if GetUnitToUnitDistance(bot, ally_tower) < 1000 then
+function Reward.is_near_ally_tower()
+    local ally_tower = GetTower(TEAM_RADIANT, TOWER_MID_1)
+    if ally_tower == nil then
+        return 0
+    end
+    if GetUnitToUnitDistance(agent, ally_tower) < 500 then
         return 1
     else
         return 0
     end
 end
 
-local last_attack_time = bot:GetLastAttackTime()
+local last_attack_time = agent:GetLastAttackTime()
 
 function Reward.get_reward(wrong_action)
 --    local my_health = get_my_health()
 --    local my_kills = get_my_kills()
---    local my_deaths = get_my_deaths()
 --    local enemy_health = get_enemy_health()
 --    local enemy_tower_health = get_enemy_tower_health()
 --    local ally_tower_health = get_ally_tower_health()
@@ -131,31 +128,32 @@ function Reward.get_reward(wrong_action)
 
     local reward = 0
 
-    if is_near_ally_tower() == 1 then
-        reward = reward + 1
-    end
+--    if Reward.is_near_ally_tower() == 1 then
+--        reward = reward + 100
+--    end
 
-    local attack_time = bot:GetLastAttackTime()
-    if attack_time ~= nil and (last_attack_time == nil or attack_time >
-            last_attack_time) then
-        reward = reward + 5
+    local attack_time = agent:GetLastAttackTime()
+    if attack_time ~= nil and (last_attack_time == nil or attack_time > last_attack_time) then
+        reward = reward + 1
     end
     last_attack_time = attack_time
 
-    if wrong_action == 1 then
-        reward = reward - 0.1
-    end
+--  if wrong_action == 1 then
+--      reward = reward - 0.1
+--  end
+
+--  local deaths = get_my_deaths()
+--  reward = reward - (deaths - last_deaths) * 100
+--  last_deaths = deaths
 
 --    last_enemy_tower_health = enemy_tower_health
 --    last_ally_tower_health = ally_tower_health
 --    last_kills = my_kills
---    last_deaths = my_deaths
 --    last_hits = hits
 --    last_my_health = my_health
 --    last_enemy_health = enemy_health
 
-    print('reward: ', reward)
     return reward
 end
 
-return Reward;
+return Reward
