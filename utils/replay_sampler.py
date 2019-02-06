@@ -49,9 +49,8 @@ def main():
     parser.add_argument('--print', action='store_true', help='Print the recorded actions')
     args = parser.parse_args()
 
-    replays_folder = 'replays-action'
-    if not os.path.exists(replays_folder):
-        os.makedirs(replays_folder)
+    replays_folder = 'diy-replays'
+    os.makedirs(replays_folder, exist_ok=True)
     filename = os.path.join(replays_folder, args.replay_name)
 
     if args.record:
