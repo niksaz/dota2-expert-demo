@@ -10,6 +10,9 @@ INTERVAL = 0.01
 DURATION = 0.5
 PAUSE = 1
 
+restart_episode_called = 0
+RESTART_AFTER_EPISODES = 100
+
 
 def prepare_steam_client():
     if _is_steam_launched():
@@ -28,6 +31,8 @@ def prepare_dota_client():
     if _is_dota_launched():
         _focus_dota_window()
     else:
+        # Click on the library option
+        gui.click(x=307, y=85, pause=PAUSE)
         # Search for Dota 2 in the library
         gui.click(x=150, y=120)
         gui.typewrite('dota', interval=INTERVAL)
@@ -55,6 +60,13 @@ def start_game():
 
 
 def restart_game():
+    global restart_episode_called
+    restart_episode_called += 1
+    if restart_episode_called >= RESTART_AFTER_EPISODES:
+        restart_episode_called = 0
+        close_dota_client()
+        close_steam_client()
+
     # Add a full restart here after a certain number of episodes
     prepare_steam_client()
     prepare_dota_client()
@@ -68,7 +80,7 @@ def restart_game():
     # Wait until the in-game UI is visible
     cnt = 0
     while True:
-        point = gui.locateOnScreen('icons/inactive_arrow.png')
+        point = gui.locateOnScreen('images/inactive_arrow.png')
         if point:
             break
         cnt += 1
