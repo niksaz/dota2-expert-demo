@@ -108,7 +108,7 @@ def learn(env,
           train_freq=1,
           batch_size=32,
           print_freq=1,
-          checkpoint_freq=1,
+          checkpoint_freq=100,
           learning_starts=1000,
           gamma=1.0,
           target_network_update_freq=500,
@@ -316,7 +316,9 @@ def learn(env,
 
                 pairs = env.step(action)
                 action, (new_obs, rew, done, _) = pairs[-1]
+                # Write down the real reward but learn from normalized version
                 episode_rewards[-1] += rew
+                rew = np.sign(rew) * np.log(1 + np.abs(rew))
                 new_obs = StatePreprocessor.process(new_obs)
 
                 logger.log('{}/{} obs {} action {}'.format(act_step_t, total_timesteps, obs, action))
