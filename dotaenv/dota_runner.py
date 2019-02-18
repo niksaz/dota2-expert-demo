@@ -2,6 +2,7 @@ import time
 import json
 import subprocess
 import pyautogui as gui
+from pyscreeze import ImageNotFoundException
 
 with open('gui_config.json', 'r') as finput:
     config = json.load(finput)
@@ -141,9 +142,12 @@ def calibrate_dota_client():
 def __wait_until_image_is_displayed(image_path):
     # Wait for 60 seconds at maximum
     for _ in range(60):
-        point = gui.locateOnScreen(image_path)
-        if point:
-            return True
+        try:
+            point = gui.locateOnScreen(image_path)
+            if point:
+                return True
+        except ImageNotFoundException:
+            pass
         time.sleep(1.0)
     return False
 
