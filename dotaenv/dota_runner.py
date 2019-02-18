@@ -40,7 +40,9 @@ def prepare_steam_client():
 
         # Run the first option
         gui.press('enter', pause=PAUSE)
-        time.sleep(30)
+        if not __wait_until_image_is_displayed('images/steam_has_loaded.png'):
+            prepare_steam_client()
+            return
 
 
 def prepare_dota_client():
@@ -50,6 +52,9 @@ def prepare_dota_client():
         gui.click(x=STEAM_LIBRARY['x'], y=STEAM_LIBRARY['y'], pause=PAUSE)
         gui.click(x=STEAM_SEARCH['x'], y=STEAM_SEARCH['y'])
         gui.typewrite('dota', interval=TYPEWRITE_INT)
+        if not __wait_until_image_is_displayed('images/dota_is_found.png'):
+            prepare_dota_client()
+            return
 
         gui.click(x=STEAM_PLAY['x'], y=STEAM_PLAY['y'], pause=30)
         calibrate_dota_client()
@@ -88,14 +93,9 @@ def restart_game():
     gui.press('\\', pause=PAUSE)
 
     # Wait until the in-game UI is visible
-    cnt = 0
-    while True:
-        point = gui.locateOnScreen('images/inactive_arrow.png')
-        if point:
-            break
-        cnt += 1
-        if cnt >= 120:
-            restart_game()
+    if not __wait_until_image_is_displayed('images/ingame_arrow.png'):
+        restart_game()
+        return
 
     # Start the game right away
     gui.press('\\', pause=PAUSE)
@@ -136,6 +136,16 @@ def calibrate_dota_client():
     gui.typewrite('host_timescale 5', interval=TYPEWRITE_INT)
     gui.press('enter', pause=PAUSE)
     gui.press('\\', pause=PAUSE)
+
+
+def __wait_until_image_is_displayed(image_path):
+    # Wait for 60 seconds at maximum
+    for _ in range(60):
+        point = gui.locateOnScreen(image_path)
+        if point:
+            return True
+        time.sleep(1.0)
+    return False
 
 
 def _is_steam_launched():
