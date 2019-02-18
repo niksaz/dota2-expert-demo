@@ -252,19 +252,16 @@ def learn(env,
         os.makedirs(experiment_dir)
 
     summary_dir = os.path.join(experiment_dir, 'summaries')
-    if not os.path.exists(summary_dir):
-        os.makedirs(summary_dir)
+    os.makedirs(summary_dir, exist_ok=True)
     summary_writer = tf.summary.FileWriter(summary_dir)
 
     checkpoint_dir = os.path.join(experiment_dir, 'checkpoints')
-    if not os.path.exists(checkpoint_dir):
-        os.makedirs(checkpoint_dir)
+    os.makedirs(checkpoint_dir, exist_ok=True)
 
     with tempfile.TemporaryDirectory() as td:
         td = checkpoint_dir or td
 
-        if not os.path.exists(td):
-            os.makedirs(td)
+        os.makedirs(td, exist_ok=True)
         model_file = os.path.join(td, "best_model")
         model_saved = False
         saved_mean_reward = None
@@ -344,9 +341,12 @@ def learn(env,
                 logger.record_tabular("% time spent exploring", int(100 * exploration.value(act_step_t)))
                 logger.dump_tabular()
             if checkpoint_freq is not None and num_episodes % checkpoint_freq == 0:
-                # Periodically save the model
+                # Periodically save the model and the replay buffer
                 rec_model_file = os.path.join(td, "model_{}_{:.2f}".format(num_episodes, mean_5ep_reward))
                 save_variables(rec_model_file)
+                buffer_file = os.path.join(td, "buffer_{}_{}".format(num_episodes, update_step_t))
+                with open(buffer_file, 'w') as fouput:
+                    cloudpickle.dump(replay_buffer, fouput)
                 # Check whether it is best
                 if saved_mean_reward is None or mean_5ep_reward > saved_mean_reward:
                     if print_freq is not None:
