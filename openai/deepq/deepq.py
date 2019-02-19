@@ -345,8 +345,8 @@ def learn(env,
                 rec_model_file = os.path.join(td, "model_{}_{:.2f}".format(num_episodes, mean_5ep_reward))
                 save_variables(rec_model_file)
                 buffer_file = os.path.join(td, "buffer_{}_{}".format(num_episodes, update_step_t))
-                with open(buffer_file, 'w') as fouput:
-                    cloudpickle.dump(replay_buffer, fouput)
+                with open(buffer_file, 'wb') as foutput:
+                    cloudpickle.dump(replay_buffer, foutput)
                 # Check whether it is best
                 if saved_mean_reward is None or mean_5ep_reward > saved_mean_reward:
                     if print_freq is not None:
