@@ -1,6 +1,7 @@
 import os
 import time
 import tempfile
+from datetime import date
 
 import tensorflow as tf
 import zipfile
@@ -247,7 +248,8 @@ def learn(env,
     reward_shaper = ActionAdviceRewardShaper('../completed-observations')
     reward_shaper.load()
 
-    experiment_dir = os.path.join('experiments', experiment_name)
+    full_exp_name = '{}-{}'.format(date.today().isoformat(), experiment_name)
+    experiment_dir = os.path.join('experiments', full_exp_name)
     if not os.path.exists(experiment_dir):
         os.makedirs(experiment_dir)
 
