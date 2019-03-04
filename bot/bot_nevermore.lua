@@ -8,7 +8,7 @@ local Action = require(GetScriptDirectory() .. '/agent_utils/action')
 local MIN_FRAMES_BETWEEN = 1
 
 local frame_count = 0
-local total_reward = 0
+local total_frames_reward = 0
 local current_action = 0
 local action_to_do_next
 
@@ -82,7 +82,7 @@ function send_observation_message(msg)
 end
 
 function Think()
-    total_reward = total_reward + Reward.get_reward(wrong_action)
+    total_frames_reward = total_frames_reward + Reward.get_reward(wrong_action)
     frame_count = frame_count + 1
     -- Decide on what to do next based on the state
     if fsm_state == SEND_OBSERVATION then
@@ -92,13 +92,14 @@ function Think()
         message = {
             current_action, {
                 ['observation'] = observation,
-                ['reward'] = total_reward,
+                ['reward'] = total_frames_reward,
                 ['done'] = done,
             }
         }
         send_observation_message({message})
         print('FRAME COUNT', frame_count)
         frame_count = 0
+        total_frames_reward = 0
         if done then
             DebugPause()
         end
