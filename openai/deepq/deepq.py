@@ -342,21 +342,6 @@ def learn(env,
                 logger.record_tabular("mean 5 episode reward", mean_5ep_reward)
                 logger.record_tabular("% time spent exploring", int(100 * exploration.value(act_step_t)))
                 logger.dump_tabular()
-            if checkpoint_freq is not None and num_episodes % checkpoint_freq == 0:
-                # Periodically save the model and the replay buffer
-                rec_model_file = os.path.join(td, "model_{}_{:.2f}".format(num_episodes, mean_5ep_reward))
-                save_variables(rec_model_file)
-                buffer_file = os.path.join(td, "buffer_{}_{}".format(num_episodes, update_step_t))
-                with open(buffer_file, 'wb') as foutput:
-                    cloudpickle.dump(replay_buffer, foutput)
-                # Check whether it is best
-                if saved_mean_reward is None or mean_5ep_reward > saved_mean_reward:
-                    if print_freq is not None:
-                        logger.log("Saving model due to mean reward increase: {} -> {}".format(
-                            saved_mean_reward, mean_5ep_reward))
-                    save_variables(model_file)
-                    model_saved = True
-                    saved_mean_reward = mean_5ep_reward
             # Do the learning
             start = time.time()
             while update_step_t < min(act_step_t, total_timesteps):
@@ -387,6 +372,21 @@ def learn(env,
                 update_step_t += 1
             stop = time.time()
             logger.log("Learning took {:.2f} seconds".format(stop - start))
+            if checkpoint_freq is not None and num_episodes % checkpoint_freq == 0:
+                # Periodically save the model and the replay buffer
+                rec_model_file = os.path.join(td, "model_{}_{:.2f}".format(num_episodes, mean_5ep_reward))
+                save_variables(rec_model_file)
+                buffer_file = os.path.join(td, "buffer_{}_{}".format(num_episodes, update_step_t))
+                with open(buffer_file, 'wb') as foutput:
+                    cloudpickle.dump(replay_buffer, foutput)
+                # Check whether it is best
+                if saved_mean_reward is None or mean_5ep_reward > saved_mean_reward:
+                    if print_freq is not None:
+                        logger.log("Saving model due to mean reward increase: {} -> {}".format(
+                            saved_mean_reward, mean_5ep_reward))
+                    save_variables(model_file)
+                    model_saved = True
+                    saved_mean_reward = mean_5ep_reward
 
         if model_saved:
             if print_freq is not None:
