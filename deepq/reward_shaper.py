@@ -5,6 +5,7 @@ import math
 import os
 import pickle
 import matplotlib.pyplot as plt
+from collections import namedtuple
 from abc import ABC, abstractmethod
 
 import numpy as np
@@ -12,6 +13,8 @@ import numpy as np
 from deepq.state_preprocessor import StatePreprocessor
 from dotaenv.codes import SHAPER_STATE_PROJECT, SHAPER_STATE_DIM, STATE_DIM, \
     ACTIONS_TOTAL
+
+DemoStateActionPair = namedtuple('DemoStateActionPair', ['id', 'state', 'action'])
 
 
 class AbstractRewardShaper(ABC):
@@ -102,33 +105,21 @@ class ActionAdviceRewardShaper(AbstractRewardShaper):
 
     def __init__(self, replay_dir):
         super(ActionAdviceRewardShaper, self).__init__(replay_dir)
+        self.state_actions = []
 
     def load(self):
+        self.demos.append([])  # Imaginary demo to count non-demoed actions
         filenames = os.listdir(self.replay_dir)
         filenames = sorted(filenames)
-        for filename in filenames:
+        for filename in filenames[:10]:
             filepath = os.path.join(self.replay_dir, filename)
             file = open(filepath, 'r')
             lines = file.readlines()
             file.close()
             demo = self.process_replay(lines)
             self.demos.append(demo)
-            print('Loaded state-action demo from {}. Its length is {}'.format(filepath, len(demo)))
-        print('Total number of demos:', sum(map(len, self.demos)))
-        filtered_demo = []
-        for demo in self.demos:
-            for demo_state, demo_action in demo:
-                similar = False
-                for filtered_state, filtered_action in filtered_demo:
-                    sim = ActionAdviceRewardShaper.get_states_similarity(
-                        demo_state, filtered_state)
-                    if sim > ActionAdviceRewardShaper.FILTER_THRESHOLD:
-                        similar = True
-                        break
-                if not similar:
-                    filtered_demo.append((demo_state, demo_action))
-        print('Demos after filtering:', len(filtered_demo))
-        self.demos = filtered_demo
+            print('Loaded demo from {}. Its length is {}'.format(filepath, len(demo)))
+        print('Total number of state-action pairs:', sum(map(len, self.demos)))
 
     def process_replay(self, replay_lines):
         last_action = 0
@@ -147,13 +138,38 @@ class ActionAdviceRewardShaper(AbstractRewardShaper):
             last_action = action
         return demo
 
-    def get_action_potentials(self, state):
+    def filter(self):
+        self.state_actions = []
+        for ind, demo in enumerate(self.demos):
+            for demo_state, demo_action in demo:
+                similar = False
+                for (_, state, action) in self.state_actions:
+                    sim = ActionAdviceRewardShaper.get_states_similarity(
+                        demo_state, state)
+                    if sim > ActionAdviceRewardShaper.FILTER_THRESHOLD:
+                        similar = True
+                        break
+                if not similar:
+                    self.state_actions.append(DemoStateActionPair(ind, demo_state, demo_action))
+        print('State-action pairs after filtering:', len(self.state_actions))
+
+    def get_action_potentials(self, state, return_demo_indexes=False):
         potentials = np.zeros(ACTIONS_TOTAL, dtype=np.float32)
-        for demo_state, demo_action in self.demos:
+        if return_demo_indexes:
+            demo_indexes = np.zeros(ACTIONS_TOTAL, dtype=int)
+        for demo_ind, demo_state, demo_action in self.state_actions:
             potential = ActionAdviceRewardShaper.get_states_similarity(state, demo_state)
             potential *= ActionAdviceRewardShaper.K
-            potentials[demo_action] = max(potentials[demo_action], potential)
-        return potentials
+            if return_demo_indexes:
+                if potential > potentials[demo_action]:
+                    potentials[demo_action] = potential
+                    demo_indexes[demo_action] = demo_ind
+            else:
+                potentials[demo_action] = max(potentials[demo_action], potential)
+        if return_demo_indexes:
+            return potentials, demo_indexes
+        else:
+            return potentials
 
 
 def plot_distance_distrib(demo):
@@ -173,9 +189,14 @@ def plot_distance_distrib(demo):
 def main():
     reward_shaper = ActionAdviceRewardShaper('../completed-observations')
     reward_shaper.load()
-    for state, action in reward_shaper.demos:
-        print(state, action)
-        print('action potentials are:', reward_shaper.get_action_potentials(state))
+    reward_shaper.filter()
+    for ind, state, action in reward_shaper.state_actions:
+        print(ind, state, action)
+        action_potentials = reward_shaper.get_action_potentials(state)
+        print('action potentials are:', action_potentials)
+        action_potentials, action_demos = reward_shaper.get_action_potentials(state, return_demo_indexes=True)
+        print('action potentials are:', action_potentials)
+        print('action demos are:', action_demos)
 
 
 if __name__ == '__main__':
