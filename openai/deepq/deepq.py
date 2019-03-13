@@ -96,11 +96,11 @@ def load_act(path):
     return ActWrapper.load_act(path)
 
 
-def save_demo_chosen_times(demo_chosen_times, checkpoint_dir, num_episodes):
-    demo_chosen_filename = 'demo_chosen_times_{}'.format(num_episodes)
-    demo_chosen_path = os.path.join(checkpoint_dir, demo_chosen_filename)
-    with open(demo_chosen_path, 'w') as foutput:
-        print('\n'.join(map(str, demo_chosen_times)), file=foutput)
+def save_demo_switching_stats(demo_switching_stats, checkpoint_dir, num_episodes):
+    demo_switching_filename = 'demo_switching_stats_{}'.format(num_episodes)
+    demo_switching_path = os.path.join(checkpoint_dir, demo_switching_filename)
+    with open(demo_switching_path, 'w') as foutput:
+        print('\n'.join(map(str, demo_switching_stats)), file=foutput)
 
 
 def learn(env,
@@ -254,8 +254,6 @@ def learn(env,
 
     reward_shaper = ActionAdviceRewardShaper('../completed-observations')
     reward_shaper.load()
-    demo_count = len(reward_shaper.demos)
-    demo_chosen_times = [0] * demo_count
     reward_shaper.filter()
 
     full_exp_name = '{}-{}'.format(date.today().isoformat(), experiment_name)
@@ -297,6 +295,9 @@ def learn(env,
             episode_rewards.append(0.0)
             reset = True
             done = False
+            # Demo switching statistics
+            last_demo = 0
+            demo_switching_stats = [(-1, 0)]
             # Sample the episode until it is completed
             act_step_t = update_step_t
             while not done:
@@ -321,8 +322,14 @@ def learn(env,
                     kwargs['update_param_noise_threshold'] = update_param_noise_threshold
                     kwargs['update_param_noise_scale'] = True
                 biases, demo_indexes = reward_shaper.get_action_potentials(obs, return_demo_indexes=True)
-                action = act(np.array(obs)[None], biases, update_eps=update_eps, **kwargs)[0]
-                demo_chosen_times[demo_indexes[action]] += 1
+                actions, is_randoms = act(np.array(obs)[None], biases, update_eps=update_eps, **kwargs)
+                action = actions[0]
+                is_random = is_randoms[0]
+                if not is_random:
+                    demo = demo_indexes[action]
+                    if demo != last_demo:
+                        demo_switching_stats.append((update_step_t - act_step_t, demo))
+                        last_demo = demo
                 reset = False
 
                 pairs = env.step(action)
@@ -384,6 +391,9 @@ def learn(env,
                 update_step_t += 1
             stop = time.time()
             logger.log("Learning took {:.2f} seconds".format(stop - start))
+            if num_episodes % 25 == 0:
+                # And record demo_switching_stats
+                save_demo_switching_stats(demo_switching_stats, checkpoint_dir, num_episodes)
             if checkpoint_freq is not None and num_episodes % checkpoint_freq == 0:
                 # Periodically save the model
                 rec_model_file = os.path.join(td, "model_{}_{:.2f}".format(num_episodes, mean_5ep_reward))
@@ -392,8 +402,6 @@ def learn(env,
                 buffer_file = os.path.join(td, "buffer_{}_{}".format(num_episodes, update_step_t))
                 with open(buffer_file, 'wb') as foutput:
                     cloudpickle.dump(replay_buffer, foutput)
-                # And record demo_chosen_times
-                save_demo_chosen_times(demo_chosen_times, checkpoint_dir, num_episodes)
                 # Check whether the model is the best so far
                 if saved_mean_reward is None or mean_5ep_reward > saved_mean_reward:
                     if print_freq is not None:
@@ -403,7 +411,6 @@ def learn(env,
                     model_saved = True
                     saved_mean_reward = mean_5ep_reward
 
-        save_demo_chosen_times(demo_chosen_times, checkpoint_dir, num_episodes)
         if model_saved:
             if print_freq is not None:
                 logger.log("Restored model with mean reward: {}".format(saved_mean_reward))

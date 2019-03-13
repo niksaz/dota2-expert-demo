@@ -18,8 +18,8 @@ The functions in this file can are used to create the following functions:
 
     Returns
     -------
-    Tensor of dtype tf.int64 and shape (BATCH_SIZE,) with an action to be performed for
-    every element of the batch.
+    Two tensors of dtype tf.int64 and shape (BATCH_SIZE,) with an action to be performed for
+    every element of the batch and whether the action was chosen randomly.
 
 
 ======= act (in case of parameter noise) ========
@@ -169,7 +169,7 @@ def build_act(make_obs_ph, q_func, num_actions, scope="deepq", reuse=None):
 
     Returns
     -------
-    act: (tf.Variable, bool, float) -> tf.Variable
+    act: (tf.Variable, bool, float) -> (tf.Variable, tf.Variable)
         function to select and action given observation.
 `       See the top of the file for details.
     """
@@ -193,7 +193,7 @@ def build_act(make_obs_ph, q_func, num_actions, scope="deepq", reuse=None):
         output_actions = tf.cond(stochastic_ph, lambda: stochastic_actions, lambda: deterministic_actions)
         update_eps_expr = eps.assign(tf.cond(update_eps_ph >= 0, lambda: update_eps_ph, lambda: eps))
         _act = U.function(inputs=[observations_ph, biases_ph, stochastic_ph, update_eps_ph],
-                         outputs=output_actions,
+                         outputs=[output_actions, chose_random],
                          givens={update_eps_ph: -1.0, stochastic_ph: True},
                          updates=[update_eps_expr])
         def act(ob, biases_ph, stochastic=True, update_eps=-1):
@@ -374,8 +374,10 @@ def build_train(make_obs_ph, q_func, num_actions, optimizer, grad_norm_clipping=
         a bunch of functions to print debug data like q_values.
     """
     if param_noise:
-        act_f = build_act_with_param_noise(make_obs_ph, q_func, num_actions, scope=scope, reuse=reuse,
-            param_noise_filter_func=param_noise_filter_func)
+        raise NotImplemented('Biases are not supported for acting with noise in paramaters.')
+        # act_f = build_act_with_param_noise(
+        #     make_obs_ph, q_func, num_actions, scope=scope, reuse=reuse,
+        #     param_noise_filter_func=param_noise_filter_func)
     else:
         act_f = build_act(make_obs_ph, q_func, num_actions, scope=scope, reuse=reuse)
 
