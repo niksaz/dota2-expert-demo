@@ -111,7 +111,7 @@ class ActionAdviceRewardShaper(AbstractRewardShaper):
         self.demos.append([])  # Imaginary demo to count non-demoed actions
         filenames = os.listdir(self.replay_dir)
         filenames = sorted(filenames)
-        for filename in filenames[:10]:
+        for filename in filenames:
             filepath = os.path.join(self.replay_dir, filename)
             file = open(filepath, 'r')
             lines = file.readlines()

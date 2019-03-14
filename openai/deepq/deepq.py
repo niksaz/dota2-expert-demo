@@ -328,7 +328,7 @@ def learn(env,
                 if not is_random:
                     demo = demo_indexes[action]
                     if demo != last_demo:
-                        demo_switching_stats.append((update_step_t - act_step_t, demo))
+                        demo_switching_stats.append((act_step_t - update_step_t, demo))
                         last_demo = demo
                 reset = False
 
@@ -391,7 +391,7 @@ def learn(env,
                 update_step_t += 1
             stop = time.time()
             logger.log("Learning took {:.2f} seconds".format(stop - start))
-            if num_episodes % 25 == 0:
+            if num_episodes % 10 == 0:
                 # And record demo_switching_stats
                 save_demo_switching_stats(demo_switching_stats, checkpoint_dir, num_episodes)
             if checkpoint_freq is not None and num_episodes % checkpoint_freq == 0:
