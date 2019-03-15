@@ -321,7 +321,7 @@ def learn(env,
                     kwargs['reset'] = reset
                     kwargs['update_param_noise_threshold'] = update_param_noise_threshold
                     kwargs['update_param_noise_scale'] = True
-                biases, demo_indexes = reward_shaper.get_action_potentials(obs, return_demo_indexes=True)
+                biases, demo_indexes = reward_shaper.get_action_potentials_with_indexes(obs)
                 actions, is_randoms = act(np.array(obs)[None], biases, update_eps=update_eps, **kwargs)
                 action = actions[0]
                 is_random = is_randoms[0]
@@ -372,8 +372,8 @@ def learn(env,
                     else:
                         obses_t, actions, rewards, obses_tp1, dones = replay_buffer.sample(batch_size)
                         weights, batch_idxes = np.ones_like(rewards), None
-                    biases_t = pool.map(reward_shaper.get_action_potentials, obses_t)
-                    biases_tp1 = pool.map(reward_shaper.get_action_potentials, obses_tp1)
+                    biases_t = list(map(reward_shaper.get_action_potentials, obses_t))
+                    biases_tp1 = list(map(reward_shaper.get_action_potentials, obses_tp1))
                     td_errors, weighted_error = train(
                         obses_t, biases_t, actions, rewards, obses_tp1, biases_tp1, dones, weights)
 

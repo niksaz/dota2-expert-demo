@@ -153,23 +153,24 @@ class ActionAdviceRewardShaper(AbstractRewardShaper):
                     self.state_actions.append(DemoStateActionPair(ind, demo_state, demo_action))
         print('State-action pairs after filtering:', len(self.state_actions))
 
-    def get_action_potentials(self, state, return_demo_indexes=False):
+    def get_action_potentials(self, state):
         potentials = np.zeros(ACTIONS_TOTAL, dtype=np.float32)
-        if return_demo_indexes:
-            demo_indexes = np.zeros(ACTIONS_TOTAL, dtype=int)
+        for _, demo_state, demo_action in self.state_actions:
+            potential = ActionAdviceRewardShaper.get_states_similarity(state, demo_state)
+            potential *= ActionAdviceRewardShaper.K
+            potentials[demo_action] = max(potentials[demo_action], potential)
+        return potentials
+
+    def get_action_potentials_with_indexes(self, state):
+        potentials = np.zeros(ACTIONS_TOTAL, dtype=np.float32)
+        demo_indexes = np.zeros(ACTIONS_TOTAL, dtype=int)
         for demo_ind, demo_state, demo_action in self.state_actions:
             potential = ActionAdviceRewardShaper.get_states_similarity(state, demo_state)
             potential *= ActionAdviceRewardShaper.K
-            if return_demo_indexes:
-                if potential > potentials[demo_action]:
-                    potentials[demo_action] = potential
-                    demo_indexes[demo_action] = demo_ind
-            else:
-                potentials[demo_action] = max(potentials[demo_action], potential)
-        if return_demo_indexes:
-            return potentials, demo_indexes
-        else:
-            return potentials
+            if potential > potentials[demo_action]:
+                potentials[demo_action] = potential
+                demo_indexes[demo_action] = demo_ind
+        return potentials, demo_indexes
 
 
 def plot_distance_distrib(demo):
