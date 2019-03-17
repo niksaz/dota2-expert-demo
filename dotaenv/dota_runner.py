@@ -33,33 +33,41 @@ episodes_since_last_restart = 0
 
 
 def prepare_steam_client():
-    if _is_steam_launched():
-        _focus_steam_window()
-    else:
-        gui.press('winleft', pause=PAUSE)
-        gui.typewrite('steam', interval=TYPEWRITE_INT, pause=PAUSE)
 
-        # Run the first option
-        gui.press('enter', pause=PAUSE)
-        if not __wait_until_image_is_displayed('images/steam_has_loaded.png'):
-            prepare_steam_client()
-            return
+    while True:
+        if _is_steam_launched():
+            _focus_steam_window()
+            break
+        else:
+            gui.press('winleft', pause=PAUSE)
+            gui.typewrite('steam', interval=TYPEWRITE_INT, pause=PAUSE)
+
+            # Run the first option
+            gui.press('enter', pause=PAUSE)
+            if not __wait_until_image_is_displayed('images/steam_has_loaded.png'):
+                continue
+            break
 
 
 def prepare_dota_client():
-    if _is_dota_launched():
-        _focus_dota_window()
-    else:
-        gui.click(x=STEAM_LIBRARY['x'], y=STEAM_LIBRARY['y'], pause=PAUSE)
-        gui.click(x=STEAM_SEARCH['x'], y=STEAM_SEARCH['y'])
-        gui.typewrite('dota', interval=TYPEWRITE_INT)
-        if not __wait_until_image_is_displayed('images/dota_is_found.png'):
-            prepare_dota_client()
-            return
+    while True:
+        if _is_dota_launched():
+            _focus_dota_window()
+            break
+        else:
+            gui.click(x=STEAM_LIBRARY['x'], y=STEAM_LIBRARY['y'], pause=PAUSE)
+            gui.click(x=STEAM_SEARCH['x'], y=STEAM_SEARCH['y'])
+            game_search_name = 'dota'
+            for i in range(len(game_search_name)):
+                gui.press('backspace')
+            gui.typewrite(game_search_name, interval=TYPEWRITE_INT)
+            if not __wait_until_image_is_displayed('images/dota_is_found.png'):
+                continue
 
-        gui.click(x=STEAM_PLAY['x'], y=STEAM_PLAY['y'], pause=30)
-        calibrate_dota_client()
-        start_game()
+            gui.click(x=STEAM_PLAY['x'], y=STEAM_PLAY['y'], pause=30)
+            calibrate_dota_client()
+            start_game()
+            break
 
 
 def start_game():
