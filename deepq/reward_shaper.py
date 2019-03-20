@@ -17,6 +17,20 @@ from dotaenv.codes import SHAPER_STATE_PROJECT, SHAPER_STATE_DIM, STATE_DIM, \
 DemoStateActionPair = namedtuple('DemoStateActionPair', ['id', 'state', 'action'])
 
 
+def plot_distance_distrib(demo):
+    dsts = []
+    last_state = None
+    for state, _ in demo:
+        if last_state is not None:
+            dsts.append(ActionAdviceRewardShaper.get_states_similarity(last_state, state))
+        last_state = state
+
+    hist, bins = np.histogram(dsts, range=[0, 1], bins=20)
+    center = (bins[:-1] + bins[1:]) / 2
+    plt.bar(center, hist, align='center', width=bins[1]-bins[0])
+    plt.show()
+
+
 class AbstractRewardShaper(ABC):
 
     @abstractmethod
@@ -89,29 +103,40 @@ class StatePotentialRewardShaper(AbstractRewardShaper):
 
 
 class ActionAdviceRewardShaper(AbstractRewardShaper):
-    SIGMA = 0.2 * np.identity(STATE_DIM)
-    SIGMA[0][0] = 1.0
-    SIGMA[1][1] = 1.0
-    SIGMA[2][2] = 1.0
-    K = 10
+    _SIGMA = 0.2 * np.identity(STATE_DIM)
+    _SIGMA[0][0] = 1.0
+    _SIGMA[1][1] = 1.0
+    _SIGMA[2][2] = 1.0
+    _K = 10
 
-    FILTER_THRESHOLD = 0.95
+    _FILTER_THRESHOLD = 0.95
 
     @staticmethod
     def get_states_similarity(state1, state2):
         diff = state1 - state2
-        value = math.e ** (-1 / 2 * diff.dot(ActionAdviceRewardShaper.SIGMA).dot(diff))
+        value = math.e ** (-1 / 2 * diff.dot(ActionAdviceRewardShaper._SIGMA).dot(diff))
         return value
 
-    def __init__(self, replay_dir):
+    def __init__(self, replay_dir, max_timesteps, max_demos_to_load):
         super(ActionAdviceRewardShaper, self).__init__(replay_dir)
-        self.state_actions = []
+        self.merged_demo = []
+        self.max_demos_to_load = max_demos_to_load
+        self.demo_picked = np.zeros(max_timesteps, dtype=int)
+
+    def set_demo_picked(self, timestep, demo_num):
+        assert timestep < self.demo_picked.size
+        assert demo_num < len(self.demos)
+        assert demo_num != 0
+        assert self.demo_picked[timestep] == 0
+        self.demo_picked[timestep] = demo_num
 
     def load(self):
-        self.demos.append([])  # Imaginary demo to count non-demoed actions
+        self.demos.append([])  # Imaginary demo to count all-demo actions
         filenames = os.listdir(self.replay_dir)
         filenames = sorted(filenames)
         for filename in filenames:
+            if len(self.demos) - 1 == self.max_demos_to_load:
+                break
             filepath = os.path.join(self.replay_dir, filename)
             file = open(filepath, 'r')
             lines = file.readlines()
@@ -138,66 +163,81 @@ class ActionAdviceRewardShaper(AbstractRewardShaper):
             last_action = action
         return demo
 
-    def filter(self):
-        self.state_actions = []
+    def generate_merged_demo(self):
+        self.merged_demo = []
         for ind, demo in enumerate(self.demos):
             for demo_state, demo_action in demo:
                 similar = False
-                for (_, state, action) in self.state_actions:
+                for _, state, action in self.merged_demo:
                     sim = ActionAdviceRewardShaper.get_states_similarity(
                         demo_state, state)
-                    if sim > ActionAdviceRewardShaper.FILTER_THRESHOLD:
+                    if sim > ActionAdviceRewardShaper._FILTER_THRESHOLD:
                         similar = True
                         break
                 if not similar:
-                    self.state_actions.append(DemoStateActionPair(ind, demo_state, demo_action))
-        print('State-action pairs after filtering:', len(self.state_actions))
+                    self.merged_demo.append(DemoStateActionPair(ind, demo_state, demo_action))
+        print('State-action pairs after merging:', len(self.merged_demo))
 
-    def get_action_potentials(self, state):
+    def get_action_potentials(self, state, timestep):
         potentials = np.zeros(ACTIONS_TOTAL, dtype=np.float32)
-        for _, demo_state, demo_action in self.state_actions:
-            potential = ActionAdviceRewardShaper.get_states_similarity(state, demo_state)
-            potential *= ActionAdviceRewardShaper.K
-            potentials[demo_action] = max(potentials[demo_action], potential)
+        demo_following = self.demo_picked[timestep]
+        if demo_following == 0:
+            # Select from all demos
+            for _, demo_state, demo_action in self.merged_demo:
+                potential = ActionAdviceRewardShaper.get_states_similarity(state, demo_state)
+                potential *= ActionAdviceRewardShaper._K
+                potentials[demo_action] = max(potentials[demo_action], potential)
+        else:
+            # Select from the specific demo only
+            demo = self.demos[demo_following]
+            for demo_state, demo_action in demo:
+                potential = ActionAdviceRewardShaper.get_states_similarity(state, demo_state)
+                potential *= ActionAdviceRewardShaper._K
+                potentials[demo_action] = max(potentials[demo_action], potential)
         return potentials
 
-    def get_action_potentials_with_indexes(self, state):
+    def get_action_potentials_with_indexes(self, state, timestep):
         potentials = np.zeros(ACTIONS_TOTAL, dtype=np.float32)
         demo_indexes = np.zeros(ACTIONS_TOTAL, dtype=int)
-        for demo_ind, demo_state, demo_action in self.state_actions:
-            potential = ActionAdviceRewardShaper.get_states_similarity(state, demo_state)
-            potential *= ActionAdviceRewardShaper.K
-            if potential > potentials[demo_action]:
-                potentials[demo_action] = potential
-                demo_indexes[demo_action] = demo_ind
+        demo_following = self.demo_picked[timestep]
+        if demo_following == 0:
+            # Select from all demos
+            for demo_ind, demo_state, demo_action in self.merged_demo:
+                potential = ActionAdviceRewardShaper.get_states_similarity(state, demo_state)
+                potential *= ActionAdviceRewardShaper._K
+                if potential > potentials[demo_action]:
+                    potentials[demo_action] = potential
+                    demo_indexes[demo_action] = demo_ind
+        else:
+            # Select from the specific demo only
+            demo = self.demos[demo_following]
+            for demo_state, demo_action in demo:
+                potential = ActionAdviceRewardShaper.get_states_similarity(state, demo_state)
+                potential *= ActionAdviceRewardShaper._K
+                if potential > potentials[demo_action]:
+                    potentials[demo_action] = potential
+                    demo_indexes[demo_action] = demo_following
         return potentials, demo_indexes
 
 
-def plot_distance_distrib(demo):
-    dsts = []
-    last_state = None
-    for state, _ in demo:
-        if last_state is not None:
-            dsts.append(ActionAdviceRewardShaper.get_states_similarity(last_state, state))
-        last_state = state
-
-    hist, bins = np.histogram(dsts, range=[0, 1], bins=20)
-    center = (bins[:-1] + bins[1:]) / 2
-    plt.bar(center, hist, align='center', width=bins[1]-bins[0])
-    plt.show()
-
-
 def main():
-    reward_shaper = ActionAdviceRewardShaper('../completed-observations')
+    reward_shaper = ActionAdviceRewardShaper(
+        replay_dir=os.path.join('..', 'completed-observations'),
+        max_timesteps=10,
+        max_demos_to_load=10)
     reward_shaper.load()
-    reward_shaper.filter()
-    for ind, state, action in reward_shaper.state_actions:
+    reward_shaper.generate_merged_demo()
+    reward_shaper.set_demo_picked(timestep=1, demo_num=1)
+    for ind, state, action in reward_shaper.merged_demo:
         print(ind, state, action)
-        action_potentials = reward_shaper.get_action_potentials(state)
-        print('action potentials are:', action_potentials)
-        action_potentials, action_demos = reward_shaper.get_action_potentials(state, return_demo_indexes=True)
-        print('action potentials are:', action_potentials)
+        action_potentials_0 = reward_shaper.get_action_potentials(state, 0)
+        action_potentials_1, action_demos = reward_shaper.get_action_potentials_with_indexes(state, 0)
         print('action demos are:', action_demos)
+        assert np.array_equal(action_potentials_0, action_potentials_1)
+        action_potentials_0 = reward_shaper.get_action_potentials(state, 1)
+        action_potentials_1, action_demos = reward_shaper.get_action_potentials_with_indexes(state, 1)
+        print('action demos are:', action_demos)
+        assert np.array_equal(action_potentials_0, action_potentials_1)
 
 
 if __name__ == '__main__':

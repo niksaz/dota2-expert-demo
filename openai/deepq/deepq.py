@@ -23,6 +23,8 @@ from openai.deepq.models import build_q_func
 
 from deepq import StatePreprocessor, ActionAdviceRewardShaper
 
+MIN_STEPS_TO_FOLLOW_DEMO_FOR = 100
+
 
 class ActWrapper(object):
     def __init__(self, act, act_params):
@@ -96,9 +98,9 @@ def load_act(path):
     return ActWrapper.load_act(path)
 
 
-def save_demo_switching_stats(demo_switching_stats, checkpoint_dir, num_episodes):
+def save_demo_switching_stats(demo_switching_stats, dir, num_episodes):
     demo_switching_filename = 'demo_switching_stats_{}'.format(num_episodes)
-    demo_switching_path = os.path.join(checkpoint_dir, demo_switching_filename)
+    demo_switching_path = os.path.join(dir, demo_switching_filename)
     with open(demo_switching_path, 'w') as foutput:
         print('\n'.join(map(str, demo_switching_stats)), file=foutput)
 
@@ -126,7 +128,6 @@ def learn(env,
           prioritized_replay_beta_iters=None,
           prioritized_replay_eps=1e-6,
           param_noise=False,
-          callback=None,
           experiment_name='unnamed',
           load_path=None,
           **network_kwargs
@@ -184,9 +185,6 @@ def learn(env,
         epsilon to add to the TD errors when updating priorities.
     param_noise: bool
         whether or not to use parameter space noise (https://arxiv.org/abs/1706.01905)
-    callback: (locals, globals) -> None
-        function called at every steps with state of the algorithm.
-        If callback returns true training stops.
     experiment_name: str
         name of the experiment (default: trial)
     load_path: str
@@ -252,11 +250,14 @@ def learn(env,
     U.initialize()
     update_target()
 
-    reward_shaper = ActionAdviceRewardShaper('../completed-observations')
+    reward_shaper = ActionAdviceRewardShaper(
+        replay_dir=os.path.join('..', 'completed-observations'),
+        max_timesteps=total_timesteps + 18000,  # Plus max episode length
+        max_demos_to_load=1000)
     reward_shaper.load()
-    reward_shaper.filter()
+    reward_shaper.generate_merged_demo()
 
-    full_exp_name = '{}-{}'.format(date.today().isoformat(), experiment_name)
+    full_exp_name = '{}-{}'.format(date.today().strftime('%Y%m%d'), experiment_name)
     experiment_dir = os.path.join('experiments', full_exp_name)
     if not os.path.exists(experiment_dir):
         os.makedirs(experiment_dir)
@@ -264,9 +265,10 @@ def learn(env,
     summary_dir = os.path.join(experiment_dir, 'summaries')
     os.makedirs(summary_dir, exist_ok=True)
     summary_writer = tf.summary.FileWriter(summary_dir)
-
     checkpoint_dir = os.path.join(experiment_dir, 'checkpoints')
     os.makedirs(checkpoint_dir, exist_ok=True)
+    stats_dir = os.path.join(experiment_dir, 'stats')
+    os.makedirs(stats_dir, exist_ok=True)
 
     with tempfile.TemporaryDirectory() as td:
         td = checkpoint_dir or td
@@ -287,7 +289,6 @@ def learn(env,
 
         episode_rewards = []
         update_step_t = 0
-        num_episodes = len(episode_rewards)
         while update_step_t < total_timesteps:
             # Reset the environment
             obs = env.reset()
@@ -295,15 +296,14 @@ def learn(env,
             episode_rewards.append(0.0)
             reset = True
             done = False
+            # Demo preservation variables
+            demo_picked = 0
+            demo_picked_step = 0
             # Demo switching statistics
-            last_demo = 0
-            demo_switching_stats = [(-1, 0)]
+            demo_switching_stats = [(0, 0)]
             # Sample the episode until it is completed
             act_step_t = update_step_t
             while not done:
-                if callback is not None:
-                    if callback(locals(), globals()):
-                        break
                 # Take action and update exploration to the newest value
                 kwargs = {}
                 if not param_noise:
@@ -321,15 +321,20 @@ def learn(env,
                     kwargs['reset'] = reset
                     kwargs['update_param_noise_threshold'] = update_param_noise_threshold
                     kwargs['update_param_noise_scale'] = True
-                biases, demo_indexes = reward_shaper.get_action_potentials_with_indexes(obs)
+                if act_step_t - demo_picked_step >= MIN_STEPS_TO_FOLLOW_DEMO_FOR:
+                    demo_picked = 0
+                if demo_picked != 0:
+                    reward_shaper.set_demo_picked(act_step_t, demo_picked)
+                biases, demo_indexes = reward_shaper.get_action_potentials_with_indexes(obs, act_step_t)
                 actions, is_randoms = act(np.array(obs)[None], biases, update_eps=update_eps, **kwargs)
-                action = actions[0]
-                is_random = is_randoms[0]
+                action, is_random = actions[0], is_randoms[0]
                 if not is_random:
-                    demo = demo_indexes[action]
-                    if demo != last_demo:
-                        demo_switching_stats.append((act_step_t - update_step_t, demo))
-                        last_demo = demo
+                    bias_demo = demo_indexes[action]
+                    if bias_demo != demo_switching_stats[-1][1]:
+                        demo_switching_stats.append((act_step_t - update_step_t, bias_demo))
+                    if bias_demo != 0 and demo_picked == 0:
+                        demo_picked = bias_demo
+                        demo_picked_step = act_step_t + 1
                 reset = False
 
                 pairs = env.step(action)
@@ -340,12 +345,12 @@ def learn(env,
                 new_obs = StatePreprocessor.process(new_obs)
 
                 logger.log('{}/{} obs {} action {}'.format(act_step_t, total_timesteps, obs, action))
-                act_step_t += 1
                 if len(new_obs) == 0:
                     done = True
                 else:
-                    replay_buffer.add(obs, action, rew, new_obs, float(done))
+                    replay_buffer.add(obs, action, rew, new_obs, float(done), act_step_t)
                     obs = new_obs
+                act_step_t += 1
             # Post episode logging
             summary = tf.Summary(value=[tf.Summary.Value(tag="rewards", simple_value=episode_rewards[-1])])
             summary_writer.add_summary(summary, act_step_t)
@@ -368,20 +373,22 @@ def learn(env,
                     # Minimize the error in Bellman's equation on a batch sampled from replay buffer.
                     if prioritized_replay:
                         experience = replay_buffer.sample(batch_size, beta=beta_schedule.value(update_step_t))
-                        (obses_t, actions, rewards, obses_tp1, dones, weights, batch_idxes) = experience
+                        (obses_t, actions, rewards, obses_tp1, dones, ts, weights, batch_idxes) = experience
                     else:
-                        obses_t, actions, rewards, obses_tp1, dones = replay_buffer.sample(batch_size)
+                        obses_t, actions, rewards, obses_tp1, dones, ts = replay_buffer.sample(batch_size)
                         weights, batch_idxes = np.ones_like(rewards), None
-                    biases_t = list(map(reward_shaper.get_action_potentials, obses_t))
-                    biases_tp1 = list(map(reward_shaper.get_action_potentials, obses_tp1))
+                    biases_t = []
+                    for obs_t, timestep in zip(obses_t, ts):
+                        biases_t.append(reward_shaper.get_action_potentials(obs_t, timestep))
+                    biases_tp1 = []
+                    for obs_tp1, timestep in zip(obses_tp1, ts):
+                        biases_tp1.append(reward_shaper.get_action_potentials(obs_tp1, timestep + 1))
                     td_errors, weighted_error = train(
                         obses_t, biases_t, actions, rewards, obses_tp1, biases_tp1, dones, weights)
-
                     # Loss logging
                     summary = tf.Summary(
                         value=[tf.Summary.Value(tag='weighted_error', simple_value=weighted_error)])
                     summary_writer.add_summary(summary, update_step_t)
-
                     if prioritized_replay:
                         new_priorities = np.abs(td_errors) + prioritized_replay_eps
                         replay_buffer.update_priorities(batch_idxes, new_priorities)
@@ -391,9 +398,8 @@ def learn(env,
                 update_step_t += 1
             stop = time.time()
             logger.log("Learning took {:.2f} seconds".format(stop - start))
-            if num_episodes % 10 == 0:
-                # And record demo_switching_stats
-                save_demo_switching_stats(demo_switching_stats, checkpoint_dir, num_episodes)
+            # Record demo_switching_stats
+            save_demo_switching_stats(demo_switching_stats, stats_dir, num_episodes)
             if checkpoint_freq is not None and num_episodes % checkpoint_freq == 0:
                 # Periodically save the model
                 rec_model_file = os.path.join(td, "model_{}_{:.2f}".format(num_episodes, mean_5ep_reward))
