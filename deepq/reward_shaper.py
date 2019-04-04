@@ -117,7 +117,7 @@ class ActionAdviceRewardShaper(AbstractRewardShaper):
         value = math.e ** (-1 / 2 * diff.dot(ActionAdviceRewardShaper._SIGMA).dot(diff))
         return value
 
-    def __init__(self, replay_dir, max_timesteps, max_demos_to_load=10):
+    def __init__(self, replay_dir, max_timesteps, max_demos_to_load=5):
         super(ActionAdviceRewardShaper, self).__init__(replay_dir)
         self.merged_demo = []
         self.max_demos_to_load = max_demos_to_load
@@ -133,9 +133,8 @@ class ActionAdviceRewardShaper(AbstractRewardShaper):
         self.demos.append([])  # Imaginary demo to count all-demo actions
         filenames = os.listdir(self.replay_dir)
         filenames = sorted(filenames)
-        for filename in filenames:
-            if len(self.demos) - 1 == self.max_demos_to_load:
-                break
+        np.random.seed(7)
+        for filename in np.random.choice(filenames, self.max_demos_to_load, replace=False):
             filepath = os.path.join(self.replay_dir, filename)
             file = open(filepath, 'r')
             lines = file.readlines()
