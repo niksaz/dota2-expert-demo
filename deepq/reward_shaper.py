@@ -117,7 +117,7 @@ class ActionAdviceRewardShaper(AbstractRewardShaper):
         value = math.e ** (-1 / 2 * diff.dot(ActionAdviceRewardShaper._SIGMA).dot(diff))
         return value
 
-    def __init__(self, replay_dir, max_timesteps, max_demos_to_load):
+    def __init__(self, replay_dir, max_timesteps, max_demos_to_load=10):
         super(ActionAdviceRewardShaper, self).__init__(replay_dir)
         self.merged_demo = []
         self.max_demos_to_load = max_demos_to_load
@@ -126,7 +126,6 @@ class ActionAdviceRewardShaper(AbstractRewardShaper):
     def set_demo_picked(self, timestep, demo_num):
         assert timestep < self.demo_picked.size
         assert demo_num < len(self.demos)
-        assert demo_num != 0
         assert self.demo_picked[timestep] == 0
         self.demo_picked[timestep] = demo_num
 

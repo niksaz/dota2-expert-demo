@@ -9,19 +9,23 @@ from dotaenv.codes import STATE_DIM, ACTIONS_TOTAL
 
 
 class DotaEnvironment(gym.Env):
+    @staticmethod
+    def get_action_space():
+        return spaces.Discrete(ACTIONS_TOTAL)
 
-    def __init__(self):
-        self.__version__ = "0.1.0"
-        logging.info("DotaEnvironment-{}".format(self.__version__))
-
-        self.action_space = spaces.Discrete(ACTIONS_TOTAL)
-
+    @staticmethod
+    def get_observation_space():
         low = np.zeros(STATE_DIM, dtype=np.float32)
         low[0] = -1.0  # For x coordinate
         low[1] = -1.0  # For y coordinate
         high = np.ones(STATE_DIM, dtype=np.float32)
-        self.observation_space = spaces.Box(low, high, dtype=np.float32)
+        return spaces.Box(low, high, dtype=np.float32)
 
+    def __init__(self):
+        self.__version__ = "0.1.0"
+        logging.info("DotaEnvironment-{}".format(self.__version__))
+        self.action_space = self.get_action_space()
+        self.observation_space = self.get_observation_space()
         server.run_app()
 
     def step(self, action):

@@ -1,7 +1,8 @@
 import os
-import time
 import tempfile
+import multiprocessing
 from datetime import date
+from collections import namedtuple
 
 import tensorflow as tf
 import zipfile
@@ -22,8 +23,10 @@ from baselines.common.tf_util import get_session
 from openai.deepq.models import build_q_func
 
 from deepq import StatePreprocessor, ActionAdviceRewardShaper
+from dotaenv import DotaEnvironment
 
-MIN_STEPS_TO_FOLLOW_DEMO_FOR = 100
+REPLAY_DIR = os.path.join('..', 'completed-observations')
+MIN_STEPS_TO_FOLLOW_DEMO_FOR = 0
 
 
 class ActWrapper(object):
@@ -98,6 +101,12 @@ def load_act(path):
     return ActWrapper.load_act(path)
 
 
+UpdateMessage = namedtuple('UpdateMessage', ['status', 'transition', 'demo_picked'])
+UPDATE_STATUS_CONTINUE = 0
+UPDATE_STATUS_SEND_WEIGHTS = 1
+UPDATE_STATUS_FINISH = 2
+
+
 def save_demo_switching_stats(demo_switching_stats, dir, num_episodes):
     demo_switching_filename = 'demo_switching_stats_{}'.format(num_episodes)
     demo_switching_path = os.path.join(dir, demo_switching_filename)
@@ -105,12 +114,289 @@ def save_demo_switching_stats(demo_switching_stats, dir, num_episodes):
         print('\n'.join(map(str, demo_switching_stats)), file=foutput)
 
 
-def learn(env,
-          network,
+def do_network_training(
+        updates_queue: multiprocessing.Queue,
+        weights_queue: multiprocessing.Queue,
+        network, seed, lr, total_timesteps, learning_starts,
+        buffer_size, exploration_fraction, exploration_initial_eps, exploration_final_eps,
+        train_freq, batch_size, print_freq, checkpoint_freq, gamma,
+        target_network_update_freq, prioritized_replay, prioritized_replay_alpha,
+        prioritized_replay_beta0, prioritized_replay_beta_iters,
+        prioritized_replay_eps, experiment_name, load_path, network_kwargs):
+    _ = get_session()
+    set_global_seeds(seed)
+    q_func = build_q_func(network, **network_kwargs)
+
+    def make_obs_ph(name):
+        return ObservationInput(DotaEnvironment.get_observation_space(), name=name)
+
+    _, train, update_target, debug = deepq.build_train(
+        scope='deepq_train',
+        make_obs_ph=make_obs_ph,
+        q_func=q_func,
+        num_actions=DotaEnvironment.get_action_space().n,
+        optimizer=tf.train.AdamOptimizer(learning_rate=lr),
+        gamma=gamma,
+        grad_norm_clipping=10,)
+
+    if prioritized_replay:
+        replay_buffer = PrioritizedReplayBuffer(buffer_size, alpha=prioritized_replay_alpha)
+        if prioritized_replay_beta_iters is None:
+            prioritized_replay_beta_iters = total_timesteps
+        beta_schedule = LinearSchedule(prioritized_replay_beta_iters,
+                                       initial_p=prioritized_replay_beta0,
+                                       final_p=1.0)
+    else:
+        replay_buffer = ReplayBuffer(buffer_size)
+        beta_schedule = None
+
+    U.initialize()
+    update_target()
+
+    reward_shaper = ActionAdviceRewardShaper(
+        replay_dir=REPLAY_DIR,
+        max_timesteps=total_timesteps + 18000)  # Plus max episode length
+    reward_shaper.load()
+    reward_shaper.generate_merged_demo()
+
+    full_exp_name = '{}-{}'.format(date.today().strftime('%Y%m%d'), experiment_name)
+    experiment_dir = os.path.join('experiments', full_exp_name)
+    os.makedirs(experiment_dir, exist_ok=True)
+
+    learning_dir = os.path.join(experiment_dir, 'learning')
+    learning_summary_writer = tf.summary.FileWriter(learning_dir)
+
+    update_step_t = 0
+    should_finish = False
+    while not should_finish:
+        message = updates_queue.get()
+        logger.log('Got message in do_network_training')
+        if message.status == UPDATE_STATUS_CONTINUE:
+            transition = message.transition
+            replay_buffer.add(*transition)
+            next_act_step = transition[5] + 1
+            reward_shaper.set_demo_picked(next_act_step, message.demo_picked)
+
+            if update_step_t >= learning_starts and update_step_t % train_freq == 0:
+                # Minimize the error in Bellman's equation on a batch sampled from replay buffer.
+                if prioritized_replay:
+                    experience = replay_buffer.sample(batch_size, beta=beta_schedule.value(update_step_t))
+                    (obses_t, actions, rewards, obses_tp1, dones, ts, weights, batch_idxes) = experience
+                else:
+                    obses_t, actions, rewards, obses_tp1, dones, ts = replay_buffer.sample(batch_size)
+                    weights, batch_idxes = np.ones_like(rewards), None
+                biases_t = []
+                for obs_t, timestep in zip(obses_t, ts):
+                    biases_t.append(reward_shaper.get_action_potentials(obs_t, timestep))
+                biases_tp1 = []
+                for obs_tp1, timestep in zip(obses_tp1, ts):
+                    biases_tp1.append(reward_shaper.get_action_potentials(obs_tp1, timestep + 1))
+                td_errors, weighted_error = train(
+                    obses_t, biases_t, actions, rewards, obses_tp1, biases_tp1, dones, weights)
+                # Loss logging
+                summary = tf.Summary(
+                    value=[tf.Summary.Value(tag='weighted_error', simple_value=weighted_error)])
+                learning_summary_writer.add_summary(summary, update_step_t)
+                if prioritized_replay:
+                    new_priorities = np.abs(td_errors) + prioritized_replay_eps
+                    replay_buffer.update_priorities(batch_idxes, new_priorities)
+            if update_step_t % target_network_update_freq == 0:
+                # Update target network periodically.
+                update_target()
+            update_step_t += 1
+        elif message.status == UPDATE_STATUS_SEND_WEIGHTS:
+            q_func_vars = get_session().run(debug['q_func_vars'])
+            weights_queue.put(q_func_vars)
+        elif message.status == UPDATE_STATUS_FINISH:
+            should_finish = True
+        else:
+            logger.log(f'Unknown status in UpdateMessage: {message.status}')
+
+
+def do_agent_exploration(
+        updates_queue: multiprocessing.Queue,
+        q_func_vars_trained_queue: multiprocessing.Queue,
+        network, seed, lr, total_timesteps, learning_starts,
+        buffer_size, exploration_fraction, exploration_initial_eps, exploration_final_eps,
+        train_freq, batch_size, print_freq, checkpoint_freq, gamma,
+        target_network_update_freq, prioritized_replay, prioritized_replay_alpha,
+        prioritized_replay_beta0, prioritized_replay_beta_iters,
+        prioritized_replay_eps, experiment_name, load_path, network_kwargs):
+    env = DotaEnvironment()
+
+    sess = get_session()
+    set_global_seeds(seed)
+
+    q_func = build_q_func(network, **network_kwargs)
+
+    # capture the shape outside the closure so that the env object is not serialized
+    # by cloudpickle when serializing make_obs_ph
+    observation_space = env.observation_space
+    def make_obs_ph(name):
+        return ObservationInput(observation_space, name=name)
+
+    act, _, _, debug = deepq.build_train(
+        scope='deepq_act',
+        make_obs_ph=make_obs_ph,
+        q_func=q_func,
+        num_actions=env.action_space.n,
+        optimizer=tf.train.AdamOptimizer(learning_rate=lr),
+        gamma=gamma,
+        grad_norm_clipping=10, )
+
+    act_params = {
+        'make_obs_ph': make_obs_ph,
+        'q_func': q_func,
+        'num_actions': env.action_space.n, }
+
+    act = ActWrapper(act, act_params)
+
+    exploration = LinearSchedule(schedule_timesteps=int(exploration_fraction * total_timesteps),
+                                 initial_p=exploration_initial_eps,
+                                 final_p=exploration_final_eps)
+
+    U.initialize()
+
+    reward_shaper = ActionAdviceRewardShaper(
+        replay_dir=REPLAY_DIR,
+        max_timesteps=total_timesteps + 18000)  # Plus max episode length
+    reward_shaper.load()
+    reward_shaper.generate_merged_demo()
+
+    full_exp_name = '{}-{}'.format(date.today().strftime('%Y%m%d'), experiment_name)
+    experiment_dir = os.path.join('experiments', full_exp_name)
+    os.makedirs(experiment_dir, exist_ok=True)
+
+    summary_dir = os.path.join(experiment_dir, 'summaries')
+    os.makedirs(summary_dir, exist_ok=True)
+    summary_writer = tf.summary.FileWriter(summary_dir)
+    checkpoint_dir = os.path.join(experiment_dir, 'checkpoints')
+    os.makedirs(checkpoint_dir, exist_ok=True)
+    stats_dir = os.path.join(experiment_dir, 'stats')
+    os.makedirs(stats_dir, exist_ok=True)
+
+    with tempfile.TemporaryDirectory() as td:
+        td = checkpoint_dir or td
+
+        os.makedirs(td, exist_ok=True)
+        model_file = os.path.join(td, "best_model")
+        model_saved = False
+        saved_mean_reward = None
+
+        # if os.path.exists(model_file):
+        #     print('Model is loading')
+        #     load_variables(model_file)
+        #     logger.log('Loaded model from {}'.format(model_file))
+        #     model_saved = True
+        # elif load_path is not None:
+        #     load_variables(load_path)
+        #     logger.log('Loaded model from {}'.format(load_path))
+
+        def synchronize_q_func_vars():
+            updates_queue.put(UpdateMessage(UPDATE_STATUS_SEND_WEIGHTS, None, None))
+            q_func_vars_trained = q_func_vars_trained_queue.get()
+            update_q_func_expr = []
+            for var, var_trained in zip(debug['q_func_vars'], q_func_vars_trained):
+                update_q_func_expr.append(var.assign(var_trained))
+            update_q_func_expr = tf.group(*update_q_func_expr)
+            sess.run(update_q_func_expr)
+        synchronize_q_func_vars()
+
+        episode_rewards = []
+        act_step_t = 0
+        while act_step_t < total_timesteps:
+            # Reset the environment
+            obs = env.reset()
+            obs = StatePreprocessor.process(obs)
+            episode_rewards.append(0.0)
+            done = False
+            # Demo preservation variables
+            demo_picked = 0
+            demo_picked_step = 0
+            # Demo switching statistics
+            demo_switching_stats = [(0, 0)]
+            # Sample the episode until it is completed
+            act_started_step_t = act_step_t
+            while not done:
+                # Take action and update exploration to the newest value
+                biases, demo_indexes = reward_shaper.get_action_potentials_with_indexes(obs,
+                                                                                        act_step_t)
+                update_eps = exploration.value(act_step_t)
+                actions, is_randoms = act(np.array(obs)[None], biases, update_eps=update_eps)
+                action, is_random = actions[0], is_randoms[0]
+                if not is_random:
+                    bias_demo = demo_indexes[action]
+                    if bias_demo != demo_switching_stats[-1][1]:
+                        demo_switching_stats.append((act_step_t - act_started_step_t, bias_demo))
+                    if bias_demo != 0 and demo_picked == 0:
+                        demo_picked = bias_demo
+                        demo_picked_step = act_step_t + 1
+                pairs = env.step(action)
+                action, (new_obs, rew, done, _) = pairs[-1]
+                logger.log(f'{act_step_t}/{total_timesteps} obs {obs} action {action}')
+
+                # Compute state on the real reward but learn from the normalized version
+                episode_rewards[-1] += rew
+                rew = np.sign(rew) * np.log(1 + np.abs(rew))
+                new_obs = StatePreprocessor.process(new_obs)
+
+                if len(new_obs) == 0:
+                    done = True
+                else:
+                    transition = (obs, action, rew, new_obs, float(done), act_step_t)
+                    obs = new_obs
+                    act_step_t += 1
+                    if act_step_t - demo_picked_step >= MIN_STEPS_TO_FOLLOW_DEMO_FOR:
+                        demo_picked = 0
+                    reward_shaper.set_demo_picked(act_step_t, demo_picked)
+                    updates_queue.put(
+                        UpdateMessage(UPDATE_STATUS_CONTINUE, transition, demo_picked))
+            # Post episode logging
+            summary = tf.Summary(
+                value=[tf.Summary.Value(tag="rewards", simple_value=episode_rewards[-1])])
+            summary_writer.add_summary(summary, act_step_t)
+            summary = tf.Summary(
+                value=[tf.Summary.Value(tag="eps", simple_value=update_eps)])
+            summary_writer.add_summary(summary, act_step_t)
+            summary = tf.Summary(
+                value=[tf.Summary.Value(tag="episode_steps",
+                                        simple_value=act_step_t - act_started_step_t)])
+            summary_writer.add_summary(summary, act_step_t)
+            mean_5ep_reward = round(float(np.mean(episode_rewards[-5:])), 1)
+            num_episodes = len(episode_rewards)
+            if print_freq is not None and num_episodes % print_freq == 0:
+                logger.record_tabular("steps", act_step_t)
+                logger.record_tabular("episodes", num_episodes)
+                logger.record_tabular("mean 5 episode reward", mean_5ep_reward)
+                logger.record_tabular("% time spent exploring",
+                                      int(100 * exploration.value(act_step_t)))
+                logger.dump_tabular()
+            # Wait for the learning to finish and synchronize
+            synchronize_q_func_vars()
+            # Record demo_switching_stats
+            save_demo_switching_stats(demo_switching_stats, stats_dir, num_episodes)
+            if checkpoint_freq is not None and num_episodes % checkpoint_freq == 0:
+                # Periodically save the model
+                rec_model_file = os.path.join(td, "model_{}_{:.2f}".format(num_episodes,
+                                                                           mean_5ep_reward))
+                save_variables(rec_model_file)
+                # Check whether the model is the best so far
+                if saved_mean_reward is None or mean_5ep_reward > saved_mean_reward:
+                    if print_freq is not None:
+                        logger.log("Saving model due to mean reward increase: {} -> {}".format(
+                            saved_mean_reward, mean_5ep_reward))
+                    save_variables(model_file)
+                    model_saved = True
+                    saved_mean_reward = mean_5ep_reward
+
+        updates_queue.put(UpdateMessage(UPDATE_STATUS_FINISH, None, None))
+
+
+def learn(network,
           seed=None,
-          pool=None,
           lr=5e-4,
           total_timesteps=100000,
+          learning_starts=1000,
           buffer_size=50000,
           exploration_fraction=0.1,
           exploration_initial_eps=1.0,
@@ -119,7 +405,6 @@ def learn(env,
           batch_size=32,
           print_freq=1,
           checkpoint_freq=100,
-          learning_starts=1000,
           gamma=1.0,
           target_network_update_freq=500,
           prioritized_replay=False,
@@ -127,17 +412,13 @@ def learn(env,
           prioritized_replay_beta0=0.4,
           prioritized_replay_beta_iters=None,
           prioritized_replay_eps=1e-6,
-          param_noise=False,
           experiment_name='unnamed',
           load_path=None,
-          **network_kwargs
-          ):
+          **network_kwargs):
     """Train a deepq model.
 
     Parameters
     -------
-    env: gym.Env
-        environment to train on
     network: string or a function
         neural network to use as a q function approximator. If string, has to be one of the names of registered models in baselines.common.models
         (mlp, cnn, conv_only). If a function, should take an observation tensor and return a latent variable tensor, which
@@ -166,8 +447,6 @@ def learn(env,
         how often to save the model. This is so that the best version is restored
         at the end of the training. If you do not wish to restore the best version at
         the end of the training set this variable to None.
-    learning_starts: int
-        how many steps of the model to collect transitions for before learning starts
     gamma: float
         discount factor
     target_network_update_freq: int
@@ -183,8 +462,6 @@ def learn(env,
         to 1.0. If set to None equals to total_timesteps.
     prioritized_replay_eps: float
         epsilon to add to the TD errors when updating priorities.
-    param_noise: bool
-        whether or not to use parameter space noise (https://arxiv.org/abs/1706.01905)
     experiment_name: str
         name of the experiment (default: trial)
     load_path: str
@@ -198,228 +475,38 @@ def learn(env,
         Wrapper over act function. Adds ability to save it and load it.
         See header of baselines/deepq/categorical.py for details on the act function.
     """
-    # Create all the functions necessary to train the model
+    multiprocessing.set_start_method('spawn')
+    updates_queue = multiprocessing.Queue()
+    q_func_vars_trained_queue = multiprocessing.Queue()
 
-    sess = get_session()
-    set_global_seeds(seed)
+    exploration_process = multiprocessing.Process(
+        target=do_agent_exploration,
+        args=(updates_queue, q_func_vars_trained_queue,
+              network, seed, lr, total_timesteps, learning_starts,
+              buffer_size, exploration_fraction, exploration_initial_eps, exploration_final_eps,
+              train_freq, batch_size, print_freq, checkpoint_freq, gamma,
+              target_network_update_freq, prioritized_replay, prioritized_replay_alpha,
+              prioritized_replay_beta0, prioritized_replay_beta_iters,
+              prioritized_replay_eps, experiment_name, load_path, network_kwargs))
+    exploration_process.daemon = True
+    exploration_process.start()
 
-    q_func = build_q_func(network, **network_kwargs)
+    training_process = multiprocessing.Process(
+        target=do_network_training,
+        args=(updates_queue, q_func_vars_trained_queue,
+              network, seed, lr, total_timesteps, learning_starts,
+              buffer_size, exploration_fraction, exploration_initial_eps, exploration_final_eps,
+              train_freq, batch_size, print_freq, checkpoint_freq, gamma,
+              target_network_update_freq, prioritized_replay, prioritized_replay_alpha,
+              prioritized_replay_beta0, prioritized_replay_beta_iters,
+              prioritized_replay_eps, experiment_name, load_path, network_kwargs))
+    training_process.daemon = True
+    training_process.start()
 
-    # capture the shape outside the closure so that the env object is not serialized
-    # by cloudpickle when serializing make_obs_ph
+    training_process.join()
+    exploration_process.join()
 
-    observation_space = env.observation_space
-    def make_obs_ph(name):
-        return ObservationInput(observation_space, name=name)
-
-    act, train, update_target, debug = deepq.build_train(
-        make_obs_ph=make_obs_ph,
-        q_func=q_func,
-        num_actions=env.action_space.n,
-        optimizer=tf.train.AdamOptimizer(learning_rate=lr),
-        gamma=gamma,
-        grad_norm_clipping=10,
-        param_noise=param_noise
-    )
-
-    act_params = {
-        'make_obs_ph': make_obs_ph,
-        'q_func': q_func,
-        'num_actions': env.action_space.n,
-    }
-
-    act = ActWrapper(act, act_params)
-
-    # Create the replay buffer
-    if prioritized_replay:
-        replay_buffer = PrioritizedReplayBuffer(buffer_size, alpha=prioritized_replay_alpha)
-        if prioritized_replay_beta_iters is None:
-            prioritized_replay_beta_iters = total_timesteps
-        beta_schedule = LinearSchedule(prioritized_replay_beta_iters,
-                                       initial_p=prioritized_replay_beta0,
-                                       final_p=1.0)
-    else:
-        replay_buffer = ReplayBuffer(buffer_size)
-        beta_schedule = None
-    # Create the schedule for exploration starting from 1.
-    exploration = LinearSchedule(schedule_timesteps=int(exploration_fraction * total_timesteps),
-                                 initial_p=exploration_initial_eps,
-                                 final_p=exploration_final_eps)
-
-    # Initialize the parameters and copy them to the target network.
-    U.initialize()
-    update_target()
-
-    reward_shaper = ActionAdviceRewardShaper(
-        replay_dir=os.path.join('..', 'completed-observations'),
-        max_timesteps=total_timesteps + 18000,  # Plus max episode length
-        max_demos_to_load=1000)
-    reward_shaper.load()
-    reward_shaper.generate_merged_demo()
-
-    full_exp_name = '{}-{}'.format(date.today().strftime('%Y%m%d'), experiment_name)
-    experiment_dir = os.path.join('experiments', full_exp_name)
-    if not os.path.exists(experiment_dir):
-        os.makedirs(experiment_dir)
-
-    summary_dir = os.path.join(experiment_dir, 'summaries')
-    os.makedirs(summary_dir, exist_ok=True)
-    summary_writer = tf.summary.FileWriter(summary_dir)
-    checkpoint_dir = os.path.join(experiment_dir, 'checkpoints')
-    os.makedirs(checkpoint_dir, exist_ok=True)
-    stats_dir = os.path.join(experiment_dir, 'stats')
-    os.makedirs(stats_dir, exist_ok=True)
-
-    with tempfile.TemporaryDirectory() as td:
-        td = checkpoint_dir or td
-
-        os.makedirs(td, exist_ok=True)
-        model_file = os.path.join(td, "best_model")
-        model_saved = False
-        saved_mean_reward = None
-
-        if os.path.exists(model_file):
-            print('Model is loading')
-            load_variables(model_file)
-            logger.log('Loaded model from {}'.format(model_file))
-            model_saved = True
-        elif load_path is not None:
-            load_variables(load_path)
-            logger.log('Loaded model from {}'.format(load_path))
-
-        episode_rewards = []
-        update_step_t = 0
-        while update_step_t < total_timesteps:
-            # Reset the environment
-            obs = env.reset()
-            obs = StatePreprocessor.process(obs)
-            episode_rewards.append(0.0)
-            reset = True
-            done = False
-            # Demo preservation variables
-            demo_picked = 0
-            demo_picked_step = 0
-            # Demo switching statistics
-            demo_switching_stats = [(0, 0)]
-            # Sample the episode until it is completed
-            act_step_t = update_step_t
-            while not done:
-                # Take action and update exploration to the newest value
-                kwargs = {}
-                if not param_noise:
-                    update_eps = exploration.value(act_step_t)
-                    update_param_noise_threshold = 0.
-                else:
-                    update_eps = 0.
-                    # Compute the threshold such that the KL divergence between perturbed and non-perturbed
-                    # policy is comparable to eps-greedy exploration with eps = exploration.value(act_step_t).
-                    # See Appendix C.1 in Parameter Space Noise for Exploration, Plappert et al., 2017
-                    # for detailed explanation.
-                    update_param_noise_threshold = -np.log(
-                        1. - exploration.value(act_step_t) +
-                        exploration.value(act_step_t) / float(env.action_space.n))
-                    kwargs['reset'] = reset
-                    kwargs['update_param_noise_threshold'] = update_param_noise_threshold
-                    kwargs['update_param_noise_scale'] = True
-                if act_step_t - demo_picked_step >= MIN_STEPS_TO_FOLLOW_DEMO_FOR:
-                    demo_picked = 0
-                if demo_picked != 0:
-                    reward_shaper.set_demo_picked(act_step_t, demo_picked)
-                biases, demo_indexes = reward_shaper.get_action_potentials_with_indexes(obs, act_step_t)
-                actions, is_randoms = act(np.array(obs)[None], biases, update_eps=update_eps, **kwargs)
-                action, is_random = actions[0], is_randoms[0]
-                if not is_random:
-                    bias_demo = demo_indexes[action]
-                    if bias_demo != demo_switching_stats[-1][1]:
-                        demo_switching_stats.append((act_step_t - update_step_t, bias_demo))
-                    if bias_demo != 0 and demo_picked == 0:
-                        demo_picked = bias_demo
-                        demo_picked_step = act_step_t + 1
-                reset = False
-
-                pairs = env.step(action)
-                action, (new_obs, rew, done, _) = pairs[-1]
-                # Write down the real reward but learn from normalized version
-                episode_rewards[-1] += rew
-                rew = np.sign(rew) * np.log(1 + np.abs(rew))
-                new_obs = StatePreprocessor.process(new_obs)
-
-                logger.log('{}/{} obs {} action {}'.format(act_step_t, total_timesteps, obs, action))
-                if len(new_obs) == 0:
-                    done = True
-                else:
-                    replay_buffer.add(obs, action, rew, new_obs, float(done), act_step_t)
-                    obs = new_obs
-                act_step_t += 1
-            # Post episode logging
-            summary = tf.Summary(value=[tf.Summary.Value(tag="rewards", simple_value=episode_rewards[-1])])
-            summary_writer.add_summary(summary, act_step_t)
-            summary = tf.Summary(value=[tf.Summary.Value(tag="eps", simple_value=update_eps)])
-            summary_writer.add_summary(summary, act_step_t)
-            summary = tf.Summary(value=[tf.Summary.Value(tag="episode_steps", simple_value=act_step_t-update_step_t)])
-            summary_writer.add_summary(summary, act_step_t)
-            mean_5ep_reward = round(np.mean(episode_rewards[-5:]), 1)
-            num_episodes = len(episode_rewards)
-            if print_freq is not None and num_episodes % print_freq == 0:
-                logger.record_tabular("steps", act_step_t)
-                logger.record_tabular("episodes", num_episodes)
-                logger.record_tabular("mean 5 episode reward", mean_5ep_reward)
-                logger.record_tabular("% time spent exploring", int(100 * exploration.value(act_step_t)))
-                logger.dump_tabular()
-            # Do the learning
-            start = time.time()
-            while update_step_t < min(act_step_t, total_timesteps):
-                if update_step_t % train_freq == 0:
-                    # Minimize the error in Bellman's equation on a batch sampled from replay buffer.
-                    if prioritized_replay:
-                        experience = replay_buffer.sample(batch_size, beta=beta_schedule.value(update_step_t))
-                        (obses_t, actions, rewards, obses_tp1, dones, ts, weights, batch_idxes) = experience
-                    else:
-                        obses_t, actions, rewards, obses_tp1, dones, ts = replay_buffer.sample(batch_size)
-                        weights, batch_idxes = np.ones_like(rewards), None
-                    biases_t = []
-                    for obs_t, timestep in zip(obses_t, ts):
-                        biases_t.append(reward_shaper.get_action_potentials(obs_t, timestep))
-                    biases_tp1 = []
-                    for obs_tp1, timestep in zip(obses_tp1, ts):
-                        biases_tp1.append(reward_shaper.get_action_potentials(obs_tp1, timestep + 1))
-                    td_errors, weighted_error = train(
-                        obses_t, biases_t, actions, rewards, obses_tp1, biases_tp1, dones, weights)
-                    # Loss logging
-                    summary = tf.Summary(
-                        value=[tf.Summary.Value(tag='weighted_error', simple_value=weighted_error)])
-                    summary_writer.add_summary(summary, update_step_t)
-                    if prioritized_replay:
-                        new_priorities = np.abs(td_errors) + prioritized_replay_eps
-                        replay_buffer.update_priorities(batch_idxes, new_priorities)
-                if update_step_t % target_network_update_freq == 0:
-                    # Update target network periodically.
-                    update_target()
-                update_step_t += 1
-            stop = time.time()
-            logger.log("Learning took {:.2f} seconds".format(stop - start))
-            # Record demo_switching_stats
-            save_demo_switching_stats(demo_switching_stats, stats_dir, num_episodes)
-            if checkpoint_freq is not None and num_episodes % checkpoint_freq == 0:
-                # Periodically save the model
-                rec_model_file = os.path.join(td, "model_{}_{:.2f}".format(num_episodes, mean_5ep_reward))
-                save_variables(rec_model_file)
-                # And dump the replay buffer
-                buffer_file = os.path.join(td, "buffer_{}_{}".format(num_episodes, update_step_t))
-                with open(buffer_file, 'wb') as foutput:
-                    cloudpickle.dump(replay_buffer, foutput)
-                # Check whether the model is the best so far
-                if saved_mean_reward is None or mean_5ep_reward > saved_mean_reward:
-                    if print_freq is not None:
-                        logger.log("Saving model due to mean reward increase: {} -> {}".format(
-                            saved_mean_reward, mean_5ep_reward))
-                    save_variables(model_file)
-                    model_saved = True
-                    saved_mean_reward = mean_5ep_reward
-
-        if model_saved:
-            if print_freq is not None:
-                logger.log("Restored model with mean reward: {}".format(saved_mean_reward))
-            load_variables(model_file)
-
-    return act
+    updates_queue.close()
+    updates_queue.join_thread()
+    q_func_vars_trained_queue.close()
+    q_func_vars_trained_queue.join_thread()
