@@ -170,7 +170,7 @@ def do_network_training(
     should_finish = False
     while not should_finish:
         message = updates_queue.get()
-        logger.log('Got message in do_network_training')
+        logger.log(f'do_network_training ← {message}')
         if message.status == UPDATE_STATUS_CONTINUE:
             transition = message.transition
             replay_buffer.add(*transition)
