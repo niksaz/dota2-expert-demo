@@ -374,7 +374,8 @@ def do_agent_exploration(
             # Wait for the learning to finish and synchronize
             synchronize_q_func_vars()
             # Record demo_switching_stats
-            save_demo_switching_stats(demo_switching_stats, stats_dir, num_episodes)
+            if num_episodes % 10 == 0:
+                save_demo_switching_stats(demo_switching_stats, stats_dir, num_episodes)
             if checkpoint_freq is not None and num_episodes % checkpoint_freq == 0:
                 # Periodically save the model
                 rec_model_file = os.path.join(td, "model_{}_{:.2f}".format(num_episodes,
@@ -475,7 +476,6 @@ def learn(network,
         Wrapper over act function. Adds ability to save it and load it.
         See header of baselines/deepq/categorical.py for details on the act function.
     """
-    multiprocessing.set_start_method('spawn')
     updates_queue = multiprocessing.Queue()
     q_func_vars_trained_queue = multiprocessing.Queue()
 
