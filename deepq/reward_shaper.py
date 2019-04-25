@@ -103,21 +103,18 @@ class StatePotentialRewardShaper(AbstractRewardShaper):
 
 
 class ActionAdviceRewardShaper(AbstractRewardShaper):
-    _SIGMA = 0.2 * np.identity(STATE_DIM)
-    _SIGMA[0][0] = 1.0
-    _SIGMA[1][1] = 1.0
-    _SIGMA[2][2] = 1.0
+    _SIGMA = 0.2
     _K = 10
 
-    _FILTER_THRESHOLD = 0.95
+    _FILTER_THRESHOLD = 0.96
 
     @staticmethod
     def get_states_similarity(state1, state2):
         diff = state1 - state2
-        value = math.e ** (-1 / 2 * diff.dot(ActionAdviceRewardShaper._SIGMA).dot(diff))
+        value = math.e ** (-1 / 2 * ActionAdviceRewardShaper._SIGMA * np.dot(diff, diff))
         return value
 
-    def __init__(self, replay_dir, max_timesteps, max_demos_to_load=5):
+    def __init__(self, replay_dir, max_timesteps, max_demos_to_load=150):
         super(ActionAdviceRewardShaper, self).__init__(replay_dir)
         self.merged_demo = []
         self.max_demos_to_load = max_demos_to_load
@@ -133,6 +130,7 @@ class ActionAdviceRewardShaper(AbstractRewardShaper):
         self.demos.append([])  # Imaginary demo to count all-demo actions
         filenames = os.listdir(self.replay_dir)
         filenames = sorted(filenames)
+        self.max_demos_to_load = min(self.max_demos_to_load, len(filenames))
         np.random.seed(7)
         for filename in np.random.choice(filenames, self.max_demos_to_load, replace=False):
             filepath = os.path.join(self.replay_dir, filename)
