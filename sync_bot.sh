@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-BOT_FOLDER="/home/user/.local/share/Steam/steamapps/common/dota 2 beta/game/dota/scripts/vscripts/bots"
+BOT_FOLDER="/home/${USER}/.steam/steam/steamapps/common/dota 2 beta/game/dota/scripts/vscripts/bots"
 
 # remove old bots' folder
 rm -rf "$BOT_FOLDER"
