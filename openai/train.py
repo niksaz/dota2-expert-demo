@@ -24,7 +24,7 @@ def train(args, extra_args):
         num_hidden=128,
         num_layers=1,
         lr=1e-3,
-        buffer_size=10000,
+        buffer_size=100000,
         total_timesteps=500000,
         exploration_fraction=1.0,
         exploration_initial_eps=0.1,
