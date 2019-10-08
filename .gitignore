@@ -1,6 +1,5 @@
-experiments/
+experiments*/
 images/
-gui_config.json
 
 # IDE files
 .idea/
@@ -15,3 +14,4 @@ __pycache__
 
 # Jupyter notebooks
 .ipynb_checkpoints/
+

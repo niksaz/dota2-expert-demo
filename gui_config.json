@@ -1,0 +1,21 @@
+{
+  "steam_library_button": {"x": 307, "y": 85},
+  "steam_search_box": {"x": 150, "y": 120},
+  "steam_play_button": {"x": 416, "y":  236},
+  "steam_menu_option": {"x": 101, "y": 51},
+  "steam_exit_option": {"x":  101, "y": 199},
+
+  "dota_right_bottom_button": {"x": 906, "y": 809},
+  "dota_leave_game_button": {"x": 832, "y": 786},
+  "dota_menu_confirm_button": {"x": 580, "y":  571},
+  "dota_create_lobby_button": {"x": 872, "y": 640},
+  "dota_join_coaches_button": {"x":  807, "y": 484},
+  "dota_ingame_menu_button": {"x": 256, "y": 256},
+  "dota_ingame_confirm_button": {"x": 585, "y": 585},
+  "dota_exit_button": {"x": 1022, "y": 256},
+
+  "typewrite_interval": 0.01,
+  "mouse_movement_duration": 0.5,
+  "in_between_pause": 1.0,
+  "restart_client_every_nth": 100
+}
