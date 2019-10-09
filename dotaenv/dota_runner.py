@@ -4,7 +4,7 @@ import subprocess
 import pyautogui as gui
 from pyscreeze import ImageNotFoundException
 
-with open('gui_config.json', 'r') as finput:
+with open('config_gui.json', 'r') as finput:
     config = json.load(finput)
 print('GUI config', config)
 
@@ -33,7 +33,6 @@ episodes_since_last_restart = 0
 
 
 def prepare_steam_client():
-
     while True:
         if _is_steam_launched():
             _focus_steam_window()

@@ -1,6 +1,7 @@
 import sys
 import os.path as osp
 import numpy as np
+import json
 
 from baselines.common.cmd_util import common_arg_parser, parse_unknown_args
 from baselines import logger
@@ -14,7 +15,7 @@ except ImportError:
     MPI = None
 
 
-def train(args, extra_args):
+def train(args, extra_args, config):
     env_type = 'steam'
     env_id = 'dota2'
     print('env_type: {}'.format(env_type))
@@ -45,9 +46,11 @@ def train(args, extra_args):
             alg_kwargs['network'] = get_default_network(env_type)
 
     print('Training {} on {}:{} with arguments \n{}'.format(args.alg, env_type, env_id, alg_kwargs))
+    print('Shaping config is {}'.format(config))
+    config['max_timesteps_to_shape'] += alg_kwargs['total_timesteps']
 
     seed = args.seed
-    learn(seed=seed, **alg_kwargs)
+    learn(seed=seed, config=config, **alg_kwargs)
 
 
 def get_default_network(env_type):
@@ -83,6 +86,10 @@ def main(args):
         print('Please, specify the name of the experiment in --exp_name')
         exit(0)
 
+    if args.config is None:
+        print('Please, specify the path to the config via --config')
+        exit(0)
+
     if MPI is None or MPI.COMM_WORLD.Get_rank() == 0:
         rank = 0
         logger.configure()
@@ -90,7 +97,10 @@ def main(args):
         logger.configure(format_strs=[])
         rank = MPI.COMM_WORLD.Get_rank()
 
-    train(args, extra_args)
+    with open(args.config, 'r') as finput:
+        config = json.load(finput)
+
+    train(args, extra_args, config)
     return
 
     if args.save_path is not None and rank == 0:

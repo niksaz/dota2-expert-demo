@@ -11,8 +11,7 @@ from abc import ABC, abstractmethod
 import numpy as np
 
 from deepq.state_preprocessor import StatePreprocessor
-from dotaenv.codes import SHAPER_STATE_PROJECT, SHAPER_STATE_DIM, STATE_DIM, \
-    ACTIONS_TOTAL
+from dotaenv.codes import SHAPER_STATE_PROJECT, SHAPER_STATE_DIM, ACTIONS_TOTAL
 
 DemoStateActionPair = namedtuple('DemoStateActionPair', ['id', 'state', 'action'])
 
@@ -114,11 +113,11 @@ class ActionAdviceRewardShaper(AbstractRewardShaper):
         value = math.e ** (-1 / 2 * ActionAdviceRewardShaper._SIGMA * np.dot(diff, diff))
         return value
 
-    def __init__(self, replay_dir, max_timesteps, max_demos_to_load=150):
-        super(ActionAdviceRewardShaper, self).__init__(replay_dir)
+    def __init__(self, config):
+        super(ActionAdviceRewardShaper, self).__init__(config['replays_dir'])
         self.merged_demo = []
-        self.max_demos_to_load = max_demos_to_load
-        self.demo_picked = np.zeros(max_timesteps, dtype=int)
+        self.max_demos_to_load = config['max_demos_to_load']
+        self.demo_picked = np.zeros(config['max_timesteps_to_shape'], dtype=int)
 
     def set_demo_picked(self, timestep, demo_num):
         assert timestep < self.demo_picked.size
@@ -218,9 +217,12 @@ class ActionAdviceRewardShaper(AbstractRewardShaper):
 
 def main():
     reward_shaper = ActionAdviceRewardShaper(
-        replay_dir=os.path.join('..', 'completed-observations'),
-        max_timesteps=10,
-        max_demos_to_load=10)
+        config={
+            'replays_dir': '../completed-observations',
+            'max_timesteps_to_shape': 10,
+            'max_demos_to_load': 10,
+        }
+    )
     reward_shaper.load()
     reward_shaper.generate_merged_demo()
     reward_shaper.set_demo_picked(timestep=1, demo_num=1)

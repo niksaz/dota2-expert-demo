@@ -1,0 +1,5 @@
+{
+  "replays_dir": "../completed-observations",
+  "max_timesteps_to_shape": 18000,
+  "max_demos_to_load": 150
+}

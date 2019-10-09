@@ -25,7 +25,6 @@ from openai.deepq.models import build_q_func
 from deepq import StatePreprocessor, ActionAdviceRewardShaper
 from dotaenv import DotaEnvironment
 
-REPLAY_DIR = os.path.join('..', 'completed-observations')
 MIN_STEPS_TO_FOLLOW_DEMO_FOR = 0
 
 
@@ -117,7 +116,7 @@ def save_demo_switching_stats(demo_switching_stats, dir, num_episodes):
 def do_network_training(
         updates_queue: multiprocessing.Queue,
         weights_queue: multiprocessing.Queue,
-        network, seed, lr, total_timesteps, learning_starts,
+        network, seed, config, lr, total_timesteps, learning_starts,
         buffer_size, exploration_fraction, exploration_initial_eps, exploration_final_eps,
         train_freq, batch_size, print_freq, checkpoint_freq, gamma,
         target_network_update_freq, prioritized_replay, prioritized_replay_alpha,
@@ -153,9 +152,7 @@ def do_network_training(
     U.initialize()
     update_target()
 
-    reward_shaper = ActionAdviceRewardShaper(
-        replay_dir=REPLAY_DIR,
-        max_timesteps=total_timesteps + 18000)  # Plus max episode length
+    reward_shaper = ActionAdviceRewardShaper(config=config)
     reward_shaper.load()
     reward_shaper.generate_merged_demo()
 
@@ -216,7 +213,7 @@ def do_network_training(
 def do_agent_exploration(
         updates_queue: multiprocessing.Queue,
         q_func_vars_trained_queue: multiprocessing.Queue,
-        network, seed, lr, total_timesteps, learning_starts,
+        network, seed, config, lr, total_timesteps, learning_starts,
         buffer_size, exploration_fraction, exploration_initial_eps, exploration_final_eps,
         train_freq, batch_size, print_freq, checkpoint_freq, gamma,
         target_network_update_freq, prioritized_replay, prioritized_replay_alpha,
@@ -257,9 +254,7 @@ def do_agent_exploration(
 
     U.initialize()
 
-    reward_shaper = ActionAdviceRewardShaper(
-        replay_dir=REPLAY_DIR,
-        max_timesteps=total_timesteps + 18000)  # Plus max episode length
+    reward_shaper = ActionAdviceRewardShaper(config=config)
     reward_shaper.load()
     reward_shaper.generate_merged_demo()
 
@@ -395,6 +390,7 @@ def do_agent_exploration(
 
 def learn(network,
           seed=None,
+          config=None,
           lr=5e-4,
           total_timesteps=100000,
           learning_starts=1000,
@@ -482,7 +478,7 @@ def learn(network,
     exploration_process = multiprocessing.Process(
         target=do_agent_exploration,
         args=(updates_queue, q_func_vars_trained_queue,
-              network, seed, lr, total_timesteps, learning_starts,
+              network, seed, config, lr, total_timesteps, learning_starts,
               buffer_size, exploration_fraction, exploration_initial_eps, exploration_final_eps,
               train_freq, batch_size, print_freq, checkpoint_freq, gamma,
               target_network_update_freq, prioritized_replay, prioritized_replay_alpha,
@@ -494,7 +490,7 @@ def learn(network,
     training_process = multiprocessing.Process(
         target=do_network_training,
         args=(updates_queue, q_func_vars_trained_queue,
-              network, seed, lr, total_timesteps, learning_starts,
+              network, seed, config, lr, total_timesteps, learning_starts,
               buffer_size, exploration_fraction, exploration_initial_eps, exploration_final_eps,
               train_freq, batch_size, print_freq, checkpoint_freq, gamma,
               target_network_update_freq, prioritized_replay, prioritized_replay_alpha,
