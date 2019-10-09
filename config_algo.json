@@ -1,5 +1,10 @@
 {
   "replays_dir": "../completed-observations",
   "max_timesteps_to_shape": 18000,
-  "max_demos_to_load": 150
+  "max_demos_to_load": 150,
+  "merge_strategy": {
+    "name": "random",
+    "seed": 7,
+    "sample_size": 1776
+  }
 }

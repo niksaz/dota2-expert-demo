@@ -118,6 +118,7 @@ class ActionAdviceRewardShaper(AbstractRewardShaper):
         self.merged_demo = []
         self.max_demos_to_load = config['max_demos_to_load']
         self.demo_picked = np.zeros(config['max_timesteps_to_shape'], dtype=int)
+        self.merge_strategy = config['merge_strategy']
 
     def set_demo_picked(self, timestep, demo_num):
         assert timestep < self.demo_picked.size
@@ -160,17 +161,34 @@ class ActionAdviceRewardShaper(AbstractRewardShaper):
 
     def generate_merged_demo(self):
         self.merged_demo = []
-        for ind, demo in enumerate(self.demos):
-            for demo_state, demo_action in demo:
-                similar = False
-                for _, state, action in self.merged_demo:
-                    sim = ActionAdviceRewardShaper.get_states_similarity(
-                        demo_state, state)
-                    if sim > ActionAdviceRewardShaper._FILTER_THRESHOLD:
-                        similar = True
-                        break
-                if not similar:
-                    self.merged_demo.append(DemoStateActionPair(ind, demo_state, demo_action))
+
+        if self.merge_strategy['name'] == 'random':
+            assert 'seed' in self.merge_strategy and 'sample_size' in self.merge_strategy
+            demo_pairs = []
+            for ind, demo in enumerate(self.demos):
+                for demo_state, demo_action in demo:
+                    demo_pairs.append(DemoStateActionPair(ind, demo_state, demo_action))
+            fixed_generator = np.random.RandomState(seed=self.merge_strategy['seed'])
+            sample_idx = fixed_generator.choice(len(demo_pairs),
+                                                self.merge_strategy['sample_size'],
+                                                replace=False)
+            sample_idx.sort()
+            self.merged_demo = [demo_pairs[i] for i in sample_idx]
+        elif self.merge_strategy['name'] == 'similarity':
+            for ind, demo in enumerate(self.demos):
+                for demo_state, demo_action in demo:
+                    similar = False
+                    for _, state, action in self.merged_demo:
+                        sim = ActionAdviceRewardShaper.get_states_similarity(
+                            demo_state, state)
+                        if sim > ActionAdviceRewardShaper._FILTER_THRESHOLD:
+                            similar = True
+                            break
+                    if not similar:
+                        self.merged_demo.append(DemoStateActionPair(ind, demo_state, demo_action))
+        else:
+            raise NotImplementedError('Unknown merging strategy: {}'.format(self.merge_strategy))
+
         print('State-action pairs after merging:', len(self.merged_demo))
 
     def get_action_potentials(self, state, timestep):
@@ -219,8 +237,13 @@ def main():
     reward_shaper = ActionAdviceRewardShaper(
         config={
             'replays_dir': '../completed-observations',
-            'max_timesteps_to_shape': 10,
-            'max_demos_to_load': 10,
+            'max_timesteps_to_shape': 18000,
+            'max_demos_to_load': 150,
+            'merge_strategy': {
+                'name': 'random',
+                'seed': 7,
+                'sample_size': 1776
+            }
         }
     )
     reward_shaper.load()
