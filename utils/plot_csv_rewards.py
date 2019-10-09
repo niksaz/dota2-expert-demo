@@ -136,27 +136,27 @@ def main(draw_first, draw_second, draw_third):
             'run_20190420-50-demos-merged-sigma-02_summaries-tag-rewards.csv',
             'run_20190421-50-demos-merged-sigma-02_summaries-tag-rewards.csv'
         ], [
-            'Запуск 1',
-            'Запуск 2',
-            'Запуск 3',
+            'Run 1',
+            'Run 2',
+            'Run 3',
         ])
     if draw_second:
         # Compiling the second paper graph
         draw_mean_var_graphs('/Users/niksaz/4-RnD/csv-results', [
-            Experiment('Без демонстраций', 'k', 'black', demo_filenames_dict[0]),
-            Experiment('С одной демонстрацией', 'm', 'magenta', demo_filenames_dict[1]),
+            Experiment('No demonstrations', 'k', 'black', demo_filenames_dict[0]),
+            Experiment('Single demonstration', 'm', 'magenta', demo_filenames_dict[1]),
         ])
     if draw_third:
         # Compiling the third paper graph
         draw_mean_var_graphs('/Users/niksaz/4-RnD/csv-results', [
-            Experiment('С 1 демнострацией', 'm', 'magenta', demo_filenames_dict[1]),
-            Experiment('С 50 демнострациями', 'y', 'yellow', demo_filenames_dict[50]),
-            # Experiment('С 150 демнострациями', 'c', 'cyan', demo_filenames_dict[150]),
-            Experiment('С 254 демнострациями', 'b', 'blue', demo_filenames_dict[254]),
-            # Experiment('С 254 демонстрациями используя кластеризацию', 'r', 'red', [
-            #     'run_20190427-cluster-all-1700_summaries-tag-rewards.csv',
-            #     'run_20190428-cluster-all-1700_summaries-tag-rewards.csv',
-            # ]),
+            Experiment('With 1 demonstration', 'm', 'magenta', demo_filenames_dict[1]),
+            Experiment('With 50 demonstrations', 'y', 'yellow', demo_filenames_dict[50]),
+            Experiment('With 150 demonstrations', 'c', 'cyan', demo_filenames_dict[150]),
+            Experiment('With 254 demonstrations', 'b', 'blue', demo_filenames_dict[254]),
+            Experiment('With 254 demonstrations using clustering', 'r', 'red', [
+                'run_20190427-cluster-all-1700_summaries-tag-rewards.csv',
+                'run_20190428-cluster-all-1700_summaries-tag-rewards.csv',
+            ]),
         ])
 
 
