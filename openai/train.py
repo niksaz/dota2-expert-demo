@@ -15,7 +15,7 @@ except ImportError:
     MPI = None
 
 
-def train(args, extra_args, config):
+def train(args, extra_args):
     env_type = 'steam'
     env_id = 'dota2'
     print('env_type: {}'.format(env_type))
@@ -36,7 +36,7 @@ def train(args, extra_args, config):
         batch_size=32,
         prioritized_replay=True,
         prioritized_replay_alpha=0.6,
-        experiment_name=args.exp_name,
+        experiment_name=args.id,
         dueling=True)
     alg_kwargs.update(extra_args)
     if args.network:
@@ -44,10 +44,12 @@ def train(args, extra_args, config):
     else:
         if alg_kwargs.get('network') is None:
             alg_kwargs['network'] = get_default_network(env_type)
-
     print('Training {} on {}:{} with arguments \n{}'.format(args.alg, env_type, env_id, alg_kwargs))
-    print('Shaping config is {}'.format(config))
+
+    with open(args.config, 'r') as finput:
+        config = json.load(finput)
     config['max_timesteps_to_shape'] += alg_kwargs['total_timesteps']
+    print('Algorithm config is {}'.format(config))
 
     seed = args.seed
     learn(seed=seed, config=config, **alg_kwargs)
@@ -79,15 +81,17 @@ def main(args):
     np.set_printoptions(precision=3)
 
     arg_parser = common_arg_parser()
+    arg_parser.add_argument('--id', help='name of the experiment for saving', type=str, default=None)
+    arg_parser.add_argument('--config', help='path to the algorithm config', type=str, default=None)
     args, unknown_args = arg_parser.parse_known_args(args)
     extra_args = parse_cmdline_kwargs(unknown_args)
 
-    if args.exp_name is None:
-        print('Please, specify the name of the experiment in --exp_name')
+    if args.id is None:
+        print('Please, specify the name of the experiment in --id')
         exit(0)
 
     if args.config is None:
-        print('Please, specify the path to the config via --config')
+        print('Please, specify the path to the algorithm config via --config')
         exit(0)
 
     if MPI is None or MPI.COMM_WORLD.Get_rank() == 0:
@@ -97,10 +101,7 @@ def main(args):
         logger.configure(format_strs=[])
         rank = MPI.COMM_WORLD.Get_rank()
 
-    with open(args.config, 'r') as finput:
-        config = json.load(finput)
-
-    train(args, extra_args, config)
+    train(args, extra_args)
     return
 
     if args.save_path is not None and rank == 0:
