@@ -38,9 +38,9 @@ def init_the_plot():
 
 def draw_the_plot(y_limit):
     fontsize = 16
-    plt.xlabel('Шагов тренировки', fontsize=fontsize)
+    plt.xlabel('Training Steps', fontsize=fontsize)
     plt.xticks(fontsize=fontsize)
-    plt.ylabel('Награда', fontsize=fontsize)
+    plt.ylabel('Episode Discounted Reward', fontsize=fontsize)
     plt.yticks(fontsize=fontsize)
     plt.axis([None, None, 0, y_limit])
     plt.legend(loc='upper left', prop={'size': fontsize})
