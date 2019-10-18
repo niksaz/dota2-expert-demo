@@ -97,68 +97,88 @@ def draw_smoothed_graphs(rewards_dir, filenames, labels):
     draw_the_plot(y_limit=80)
 
 
-def main(draw_first, draw_second, draw_third):
-    demo_filenames_dict = {
-        0: [
+def verify_results_existence(results_dir, id_filenames_dict):
+    for filenames in id_filenames_dict.values():
+        for filename in filenames:
+            result_filename = os.path.join(results_dir, filename)
+            assert os.path.exists(result_filename)
+
+
+def main():
+    results_dir = '/Users/niksaz/4-RnD/csv-results'
+    id_filenames_dict = {
+        '0-demo': [
             'run_20190504-no-demo-seed-50_summaries-tag-rewards.csv',
             'run_20190506-no-demo-seed-98_summaries-tag-rewards.csv',
             'run_20190506-no-demo-seed-79_summaries-tag-rewards.csv',
             'run_20190508-no-demo-seed-92_summaries-tag-rewards.csv',
         ],
-        1: [
+        '1-demo': [
             'run_20190415-1-random-full-sigma-02_summaries-tag-rewards.csv',
             'run_20190416-1-random-full-sigma-02_summaries-tag-rewards.csv',
             'run_20190504-1-demo-1725_summaries-tag-rewards.csv',
             'run_20190505-1-demo-1738_summaries-tag-rewards.csv',
         ],
-        50: [
+        '50-demos': [
             'run_20190419-50-demos-merged-sigma-02_summaries-tag-rewards.csv',
             'run_20190421-50-demos-merged-sigma-02_summaries-tag-rewards.csv',
             'run_20190429-50-demos-merged-seed-90_summaries-tag-rewards.csv',
             'run_20190503-50-demos-seed-32_summaries-tag-rewards.csv',
         ],
-        150: [
+        '150-demos': [
             'run_20190423-150-demos-merged-sigma-02_summaries-tag-rewards.csv',
             'run_20190425-150-demos-merged-sigma-02_summaries-tag-rewards.csv',
             'run_20190425-150-demos-merged-sigma-02_summaries-tag-rewards.csv'
         ],
-        254: [
+        '254-demos': [
             'run_20190413-all-merged-095-sigma-02_summaries-tag-rewards.csv',
             'run_20190417-all-merged-095-sigma-02_summaries-tag-rewards.csv',
             'run_20190418-all-merged-095-sigma-02_summaries-tag-rewards.csv',
             'run_20190507-all-merged-095-sigma-seed-32_summaries-tag-rewards.csv',
         ],
-    }
-    if draw_first:
-        # Compiling the first paper graph
-        draw_smoothed_graphs('/Users/niksaz/4-RnD/csv-results', [
+        'clustering': [
+            'run_20190427-cluster-all-1700_summaries-tag-rewards.csv',
+            'run_20190428-cluster-all-1700_summaries-tag-rewards.csv',
+        ],
+        'stochastic': [
             'run_20190419-50-demos-merged-sigma-02_summaries-tag-rewards.csv',
             'run_20190420-50-demos-merged-sigma-02_summaries-tag-rewards.csv',
             'run_20190421-50-demos-merged-sigma-02_summaries-tag-rewards.csv'
-        ], [
-            'Run 1',
-            'Run 2',
-            'Run 3',
-        ])
-    if draw_second:
-        # Compiling the second paper graph
-        draw_mean_var_graphs('/Users/niksaz/4-RnD/csv-results', [
-            Experiment('No demonstrations', 'k', 'black', demo_filenames_dict[0]),
-            Experiment('Single demonstration', 'm', 'magenta', demo_filenames_dict[1]),
-        ])
-    if draw_third:
-        # Compiling the third paper graph
-        draw_mean_var_graphs('/Users/niksaz/4-RnD/csv-results', [
-            Experiment('With 1 demonstration', 'm', 'magenta', demo_filenames_dict[1]),
-            Experiment('With 50 demonstrations', 'y', 'yellow', demo_filenames_dict[50]),
-            Experiment('With 150 demonstrations', 'c', 'cyan', demo_filenames_dict[150]),
-            Experiment('With 254 demonstrations', 'b', 'blue', demo_filenames_dict[254]),
-            Experiment('With 254 demonstrations using clustering', 'r', 'red', [
-                'run_20190427-cluster-all-1700_summaries-tag-rewards.csv',
-                'run_20190428-cluster-all-1700_summaries-tag-rewards.csv',
-            ]),
-        ])
+        ],
+        'random': [
+            'run-20191009-random-seed-7_summaries-tag-rewards.csv',
+            'run-20191010-random-seed-46_summaries-tag-rewards.csv',
+            'run-20191011-random-seed-10_summaries-tag-rewards.csv',
+            'run-20191015-random-seed-78_summaries-tag-rewards.csv',
+        ],
+    }
+    verify_results_existence(results_dir, id_filenames_dict)
+
+    # Compiling the stochasticity visual proof graph
+    draw_smoothed_graphs(results_dir, id_filenames_dict['stochastic'], [
+        'Run 1',
+        'Run 2',
+        'Run 3',
+    ])
+    # Compiling the demo/no-demo graph
+    draw_mean_var_graphs(results_dir, [
+        Experiment('No demonstrations', 'k', 'black', id_filenames_dict['0-demo']),
+        Experiment('Single demonstration', 'm', 'magenta', id_filenames_dict['1-demo']),
+    ])
+    # Compiling the comparison of random sampling with our approach
+    draw_mean_var_graphs(results_dir, [
+        Experiment('Our approach', 'y', 'yellow', id_filenames_dict['50-demos']),
+        Experiment('Random sampling', 'm', 'magenta', id_filenames_dict['random'])
+    ])
+    # Compiling the different volumes graph
+    draw_mean_var_graphs(results_dir, [
+        Experiment('With 1 demonstration', 'y', 'yellow', id_filenames_dict['1-demo']),
+        Experiment('With 50 demonstrations', 'g', 'green', id_filenames_dict['50-demos']),
+        Experiment('With 150 demonstrations', 'c', 'cyan', id_filenames_dict['150-demos']),
+        Experiment('With 254 demonstrations', 'b', 'blue', id_filenames_dict['254-demos']),
+        Experiment('With 254 demonstrations clustered', 'r', 'red', id_filenames_dict['clustering']),
+    ])
 
 
 if __name__ == '__main__':
-    main(draw_first=True, draw_second=True, draw_third=True)
+    main()
