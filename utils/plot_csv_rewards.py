@@ -8,7 +8,7 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 
-Experiment = namedtuple('Experiment', ['name', 'params', 'filler', 'run_csvs'])
+Experiment = namedtuple('Experiment', ['name', 'color', 'run_csvs'])
 
 TOTAL_STEPS = 300000
 BIN_SIZE = 30000
@@ -16,7 +16,7 @@ assert TOTAL_STEPS % BIN_SIZE == 0
 TOTAL_BINS = TOTAL_STEPS // BIN_SIZE + 1
 
 
-def plot_with_variance(values, params, filler, label):
+def plot_with_variance(values, color, label):
     xs = np.arange(TOTAL_BINS) * BIN_SIZE
     ymeans = np.zeros(TOTAL_BINS)
     ystderrs = np.zeros(TOTAL_BINS)
@@ -28,8 +28,8 @@ def plot_with_variance(values, params, filler, label):
         ystd = np.std(xvalues)
         ystderr = ystd / np.sqrt(len(xvalues))
         ymeans[i], ystderrs[i] = ymean, ystderr
-    plt.plot(xs, ymeans, params, label=label)
-    plt.fill_between(xs, ymeans - ystderrs, ymeans + ystderrs, color=filler, alpha=.2)
+    plt.plot(xs, ymeans, color, label=label)
+    plt.fill_between(xs, ymeans - ystderrs, ymeans + ystderrs, color=color, alpha=.2)
 
 
 def init_the_plot():
@@ -66,8 +66,7 @@ def draw_mean_var_graphs(csv_dir: str, experiments: List[Experiment]) -> None:
                 if bin_id >= TOTAL_BINS:
                     continue
                 values[bin_id].append(value)
-        plot_with_variance(values, params=experiment.params, filler=experiment.filler,
-                           label=experiment.name)
+        plot_with_variance(values, color=experiment.color, label=experiment.name)
     draw_the_plot(y_limit=60)
 
 
@@ -162,21 +161,21 @@ def main():
     ])
     # Compiling the demo/no-demo graph
     draw_mean_var_graphs(results_dir, [
-        Experiment('No demonstrations', 'k', 'black', id_filenames_dict['0-demo']),
-        Experiment('Single demonstration', 'm', 'magenta', id_filenames_dict['1-demo']),
+        Experiment('No demonstrations', 'black', id_filenames_dict['0-demo']),
+        Experiment('Single demonstration', 'magenta', id_filenames_dict['1-demo']),
     ])
     # Compiling the comparison of random sampling with our approach
     draw_mean_var_graphs(results_dir, [
-        Experiment('Our approach', 'y', 'yellow', id_filenames_dict['50-demos']),
-        Experiment('Random sampling', 'm', 'magenta', id_filenames_dict['random'])
+        Experiment('Our approach', 'yellow', id_filenames_dict['50-demos']),
+        Experiment('Random sampling', 'magenta', id_filenames_dict['random'])
     ])
     # Compiling the different volumes graph
     draw_mean_var_graphs(results_dir, [
-        Experiment('With 1 demonstration', 'y', 'yellow', id_filenames_dict['1-demo']),
-        Experiment('With 50 demonstrations', 'g', 'green', id_filenames_dict['50-demos']),
-        Experiment('With 150 demonstrations', 'c', 'cyan', id_filenames_dict['150-demos']),
-        Experiment('With 254 demonstrations', 'b', 'blue', id_filenames_dict['254-demos']),
-        Experiment('With 254 demonstrations clustered', 'r', 'red', id_filenames_dict['clustering']),
+        Experiment('With 1 demonstration', 'yellow', id_filenames_dict['1-demo']),
+        Experiment('With 50 demonstrations', 'green', id_filenames_dict['50-demos']),
+        Experiment('With 150 demonstrations', 'cyan', id_filenames_dict['150-demos']),
+        Experiment('With 254 demonstrations', 'blue', id_filenames_dict['254-demos']),
+        Experiment('With 254 demonstrations clustered', 'red', id_filenames_dict['clustering']),
     ])
 
 
