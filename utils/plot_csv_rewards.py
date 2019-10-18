@@ -166,16 +166,16 @@ def main():
     ])
     # Compiling the comparison of random sampling with our approach
     draw_mean_var_graphs(results_dir, [
-        Experiment('Our approach', 'yellow', id_filenames_dict['50-demos']),
-        Experiment('Random sampling', 'magenta', id_filenames_dict['random'])
+        Experiment('Our approach', '#F5B041', id_filenames_dict['50-demos']),
+        Experiment('Random sampling', '#708090', id_filenames_dict['random'])
     ])
     # Compiling the different volumes graph
     draw_mean_var_graphs(results_dir, [
-        Experiment('With 1 demonstration', 'yellow', id_filenames_dict['1-demo']),
-        Experiment('With 50 demonstrations', 'green', id_filenames_dict['50-demos']),
-        Experiment('With 150 demonstrations', 'cyan', id_filenames_dict['150-demos']),
+        Experiment('With 1 demonstration', 'magenta', id_filenames_dict['1-demo']),
+        Experiment('With 50 demonstrations', '#F5B041', id_filenames_dict['50-demos']),
+        # Experiment('With 150 demonstrations', 'cyan', id_filenames_dict['150-demos']),
         Experiment('With 254 demonstrations', 'blue', id_filenames_dict['254-demos']),
-        Experiment('With 254 demonstrations clustered', 'red', id_filenames_dict['clustering']),
+        # Experiment('With 254 demonstrations clustered', 'red', id_filenames_dict['clustering']),
     ])
 
 
