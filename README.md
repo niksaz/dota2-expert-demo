@@ -1,7 +1,5 @@
 # Dota 2 Bot with Expert Demonstrations
 
-#### WORK IN PROGRESS!
-
 Dota2 bot that is trained by Deep RL with using expert demonstrations.
 
 The Dota 2 bot is located at **.bot/**. You should use **./sync_bot.sh** to put
